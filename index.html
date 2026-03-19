@@ -43,7 +43,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans JP',sans
 <script>
 'use strict';
 
-const VERSION="1.1.1";
+const VERSION="1.1.3";
 
 /* ═══ CONSTANTS ═══ */
 const ACTS=[{id:1,label:"ACT 1",sub:"pp.1–25",color:"#D4A017"},{id:2,label:"ACT 2a",sub:"pp.25–55",color:"#2E8B7A"},{id:3,label:"ACT 2b",sub:"pp.55–75",color:"#B94A2C"},{id:4,label:"ACT 3",sub:"pp.75–110",color:"#6B5CA5"}];
@@ -61,7 +61,7 @@ function laneY(i){const L=layout();return L.laneTop+i*(L.laneH+L.laneGap)}
 
 const THEMES={
   dark:{bg:"#0a0a12",hBg:"#0d0d18",hBrd:"#1a1a2a",tx:"#e0e0e0",txS:"#888",txM:"#555",cE:"#111119",cET:"#2a2a3a",cT:"#fff",cBrd:"#1e1e2e",iBg:"#1a1a2e",iBrd:"#2a2a3a",mBg:"#12121a",bBg:"#1a1a2e",hdl:"#555",shd:"rgba(0,0,0,.4)",aBg:"#e8b931",aFg:"#000",gBrd:"#888",bCol:"#444",lO:"20"},
-  light:{bg:"#f0ede6",hBg:"#faf8f4",hBrd:"#ddd8cc",tx:"#2c2c2c",txS:"#777",txM:"#aaa",cE:"#e8e4da",cET:"#bbb5a8",cT:"#2c2c2c",cBrd:"#d0cabb",iBg:"#f5f3ee",iBrd:"#d0cabb",mBg:"#faf8f4",bBg:"#e8e4da",hdl:"#bbb",shd:"rgba(0,0,0,.12)",aBg:"#D4A017",aFg:"#fff",gBrd:"#999",bCol:"#888",lO:"12"}
+  light:{bg:"#faf8f4",hBg:"#faf8f4",hBrd:"#ddd8cc",tx:"#2c2c2c",txS:"#777",txM:"#aaa",cE:"#e8e4da",cET:"#bbb5a8",cT:"#2c2c2c",cBrd:"#d0cabb",iBg:"#f5f3ee",iBrd:"#d0cabb",mBg:"#faf8f4",bBg:"#e8e4da",hdl:"#bbb",shd:"rgba(0,0,0,.12)",aBg:"#D4A017",aFg:"#fff",gBrd:"#999",bCol:"#888",lO:"12"}
 };
 const PALS={
   dark:["#0d0d18","#6b2a2a","#6b4a28","#5e5520","#2e5a24","#1e5448","#1e4460","#2e3068","#4a2868","#454545"],
@@ -426,8 +426,8 @@ function mkTagPicker(tags,th){
   const wrap=h("div","",{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"});
   TAG_COLS.forEach((tc,idx)=>{
     const sel=tags.includes(idx);
-    const dot=h("div","",{width:"28px",height:"28px",borderRadius:"6px",cursor:"pointer",background:tc,border:sel?`3px solid ${th.tx}`:"3px solid transparent",opacity:sel?"1":"0.4",transition:"opacity .15s"});
-    dot.onclick=()=>{const i=tags.indexOf(idx);if(i>=0)tags.splice(i,1);else tags.push(idx);wrap.querySelectorAll("div").forEach((d,di)=>{const s=tags.includes(di);d.style.border=s?`3px solid ${th.tx}`:"3px solid transparent";d.style.opacity=s?"1":"0.4"})};
+    const dot=h("div","",{width:"28px",height:"28px",borderRadius:"6px",cursor:"pointer",background:tc,border:sel?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`,opacity:sel?"1":"0.4",transition:"opacity .15s"});
+    dot.onclick=()=>{const i=tags.indexOf(idx);if(i>=0)tags.splice(i,1);else tags.push(idx);wrap.querySelectorAll("div").forEach((d,di)=>{const s=tags.includes(di);d.style.border=s?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`;d.style.opacity=s?"1":"0.4"})};
     wrap.appendChild(dot);
   });
   return wrap;
@@ -452,13 +452,13 @@ function cardModal(){
   box.appendChild(row);
   box.appendChild(h("label","",{color:th.txS},"カラー"));
   const pd=h("div","",{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"});
-  pl.forEach((pc,idx)=>{const dot=h("div","pdot",{background:pc,border:col===idx?`2px solid ${th.tx}`:"2px solid transparent"});dot.onclick=()=>{col=idx;pd.querySelectorAll(".pdot").forEach(d=>d.style.border="2px solid transparent");dot.style.border=`2px solid ${th.tx}`};pd.appendChild(dot)});box.appendChild(pd);
+  pl.forEach((pc,idx)=>{const dot=h("div","pdot",{background:pc,border:col===idx?`2px solid ${th.tx}`:`2px solid ${th.cBrd}`});dot.onclick=()=>{col=idx;pd.querySelectorAll(".pdot").forEach(d=>d.style.border=`2px solid ${th.cBrd}`);dot.style.border=`2px solid ${th.tx}`};pd.appendChild(dot)});box.appendChild(pd);
   box.appendChild(h("label","",{color:th.txS},"タグ"));
   box.appendChild(mkTagPicker(tags,th));
   /* ghost checkbox */
-  const ghostRow=h("div","",{display:"flex",alignItems:"center",gap:"8px",marginBottom:"16px"});
+  const ghostRow=document.createElement("label");ghostRow.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer";
   const gc=document.createElement("input");gc.type="checkbox";gc.checked=ghost;gc.style.cssText="width:18px;height:18px;cursor:pointer;accent-color:#888";gc.onchange=e=>ghost=e.target.checked;
-  ghostRow.appendChild(gc);ghostRow.appendChild(h("span","",{fontSize:"13px",color:th.txS},"👻 ゴースト（点線枠・シーンカウント除外）"));
+  ghostRow.appendChild(gc);ghostRow.appendChild(h("span","",{fontSize:"13px",color:th.txS},"ゴースト（点線枠・シーンカウント除外）"));
   box.appendChild(ghostRow);
   const btns=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center"});
   const del=h("button","btn",{background:"#c0392b",color:"#fff",fontSize:"13px",padding:"8px 14px"},"🗑 削除");
@@ -475,7 +475,7 @@ function groupModal(){
   const group=S.editGroup,th=T(),pl=P();let col=group.color,gname=group.name||"";
   let tags=[...(group.tags||[])];
   const ov=h("div","modal-overlay");
-  const box=h("div","modal-box",{background:th.mBg,border:`1px solid ${th.iBrd}`,color:th.tx,width:"400px",boxShadow:`0 24px 80px ${th.shd}`});
+  const box=h("div","modal-box",{background:th.mBg,border:`1px solid ${th.iBrd}`,color:th.tx,width:"480px",boxShadow:`0 24px 80px ${th.shd}`});
   ["click","mousedown","touchstart","touchend","pointerdown"].forEach(evt=>box.addEventListener(evt,e=>e.stopPropagation()));
   ov.addEventListener("mousedown",e=>{if(e.target===ov){closeModal();render()}});
   ov.addEventListener("touchend",e=>{if(e.target===ov){closeModal();render()}});
@@ -485,7 +485,7 @@ function groupModal(){
   ni.value=gname;ni.placeholder="グループ名";ni.oninput=e=>gname=e.target.value;box.appendChild(ni);
   box.appendChild(h("label","",{color:th.txS},"カラー"));
   const pd=h("div","",{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"});
-  pl.forEach(pc=>{const dot=h("div","pdot",{width:"32px",height:"32px",background:pc,border:col===pc?`2px solid ${th.tx}`:"2px solid transparent"});dot.onclick=()=>{col=pc;pd.querySelectorAll(".pdot").forEach(d=>d.style.border="2px solid transparent");dot.style.border=`2px solid ${th.tx}`};pd.appendChild(dot)});box.appendChild(pd);
+  pl.forEach(pc=>{const dot=h("div","pdot",{background:pc,border:col===pc?`2px solid ${th.tx}`:`2px solid ${th.cBrd}`});dot.onclick=()=>{col=pc;pd.querySelectorAll(".pdot").forEach(d=>d.style.border=`2px solid ${th.cBrd}`);dot.style.border=`2px solid ${th.tx}`};pd.appendChild(dot)});box.appendChild(pd);
   box.appendChild(h("label","",{color:th.txS},"タグ"));
   box.appendChild(mkTagPicker(tags,th));
   const btns=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center"});
