@@ -43,7 +43,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans JP',sans
 <script>
 'use strict';
 
-const VERSION="1.0.10";
+const VERSION="1.1.0";
 
 /* ═══ CONSTANTS ═══ */
 const ACTS=[{id:1,label:"ACT 1",sub:"pp.1–25",color:"#D4A017"},{id:2,label:"ACT 2a",sub:"pp.25–55",color:"#2E8B7A"},{id:3,label:"ACT 2b",sub:"pp.55–75",color:"#B94A2C"},{id:4,label:"ACT 3",sub:"pp.75–110",color:"#6B5CA5"}];
@@ -338,7 +338,7 @@ function render(){
       const isGhost=!!card.ghost;
       const borderStyle=isGhost?"2.5px dashed":(inG?"2.5px solid":"1.5px solid");
       const borderColor=inG?gc:th.bCol;
-      d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${zi+1};background:${bg};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`};opacity:${isGhost?"0.55":"1"}`;
+      d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${zi+1};background:${bg};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`}`;
       const top2=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px 0"});
       top2.appendChild(h("div","",{width:"7px",height:"7px",borderRadius:"4px",background:act.color,flexShrink:"0"}));
       const topRight=h("div","",{display:"flex",gap:"4px",alignItems:"center"});
