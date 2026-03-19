@@ -304,7 +304,7 @@ function render(){
   if(hasShare){
     const sh=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS},"↗");
     sh.title="共有（Google Drive等）";
-    sh.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();doShare()});
+    sh.onclick=doShare;
     right.appendChild(sh);
   }
   hdr.appendChild(right);
@@ -505,21 +505,13 @@ function safeName(){return(S.name||"board").replace(/[^\w\u3000-\u9FFF-]/g,"_")|
 /* share via OS share menu (Android → Google Drive etc.) */
 const hasShare=(()=>{try{return location.protocol==="https:"&&navigator.canShare&&navigator.canShare({files:[new File([""],"t.json",{type:"application/json"})]})}catch{return false}})();
 async function doShare(){
+  const j=saveJSON();
+  const file=new File([j],safeName()+".json",{type:"application/json"});
   try{
-    const j=saveJSON();
-    const fname=safeName()+".json";
-    const file=new File([j],fname,{type:"application/json"});
-
-    if(navigator.canShare&&navigator.canShare({files:[file]})){
-      await navigator.share({files:[file],title:S.name});
-      S.dirty=false;S.saveOk="ok";render();setTimeout(()=>{S.saveOk=null;render()},2000);
-    }else if(navigator.share){
-      await navigator.share({title:S.name,text:j.slice(0,500)});
-    }else{
-      alert("この環境では共有機能が使えません\nprotocol: "+location.protocol);
-    }
+    await navigator.share({files:[file],title:S.name});
+    S.dirty=false;S.saveOk="ok";render();setTimeout(()=>{S.saveOk=null;render()},2000);
   }catch(e){
-    if(e.name!=="AbortError")alert("共有エラー: "+e.name+"\n"+e.message);
+    if(e.name!=="AbortError")alert("共有エラー: "+e.name+"\n"+e.message+"\nprotocol:"+location.protocol+"\nsecure:"+window.isSecureContext);
   }
 }
 
