@@ -503,10 +503,10 @@ function saveJSON(){
 function safeName(){return(S.name||"board").replace(/[^\w\u3000-\u9FFF-]/g,"_")||"board"}
 
 /* share via OS share menu (Android → Google Drive etc.) */
-const hasShare=(()=>{try{return location.protocol==="https:"&&navigator.canShare&&navigator.canShare({files:[new File([""],"t.json",{type:"application/json"})]})}catch{return false}})();
+const hasShare=(()=>{try{return location.protocol==="https:"&&navigator.canShare&&navigator.canShare({files:[new File([""],"t.json",{type:"application/octet-stream"})]})}catch{return false}})();
 async function doShare(){
   const j=saveJSON();
-  const file=new File([j],safeName()+".json",{type:"application/json"});
+  const file=new File([j],safeName()+".json",{type:"application/octet-stream"});
   try{
     await navigator.share({files:[file],title:S.name});
     S.dirty=false;S.saveOk="ok";render();setTimeout(()=>{S.saveOk=null;render()},2000);
