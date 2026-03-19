@@ -43,7 +43,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans JP',sans
 <script>
 'use strict';
 
-const VERSION="1.1.3";
+const VERSION="1.1.4";
 
 /* ═══ CONSTANTS ═══ */
 const ACTS=[{id:1,label:"ACT 1",sub:"pp.1–25",color:"#D4A017"},{id:2,label:"ACT 2a",sub:"pp.25–55",color:"#2E8B7A"},{id:3,label:"ACT 2b",sub:"pp.55–75",color:"#B94A2C"},{id:4,label:"ACT 3",sub:"pp.75–110",color:"#6B5CA5"}];
@@ -79,7 +79,7 @@ function mkCard(a,ry,x){return{id:uid(),type:"card",x,y:ry,actIdx:a,w:CW,h:CH,de
 function mkGroup(x,ay,c){return{id:uid(),type:"group",x,y:ay,w:GW,h:GH,color:c||"#888",name:"",tags:[]}}
 
 /* ═══ STATE ═══ */
-let S={items:[],name:"新しいプロジェクト",theme:"light",zoom:1,editCard:null,editGroup:null,saveOk:null,dirty:false};
+let S={items:[],name:"新しいプロジェクト",theme:"light",editCard:null,editGroup:null,saveOk:null,dirty:false};
 
 function T(){return THEMES[S.theme]}
 function P(){return PALS[S.theme]}
@@ -166,7 +166,7 @@ function onMove(ev){
   if(rsz){
     ev.preventDefault();const{cx,cy}=gp(ev);
     const it=S.items.find(i=>i.id===rsz.id);if(!it)return;
-    it.w=Math.max(100,rsz.ow+(cx-rsz.sx)/S.zoom);it.h=Math.max(70,rsz.oh+(cy-rsz.sy)/S.zoom);
+    it.w=Math.max(100,rsz.ow+(cx-rsz.sx));it.h=Math.max(70,rsz.oh+(cy-rsz.sy));
     const el=domMap.get(it.id);if(el){el.style.width=it.w+"px";el.style.height=it.h+"px"}
     return;
   }
@@ -178,7 +178,7 @@ function onMove(ev){
   if(!drag)return;
   ev.preventDefault();
   const{cx,cy}=gp(ev);
-  const dx=(cx-drag.sx)/S.zoom,dy=(cy-drag.sy)/S.zoom;
+  const dx=(cx-drag.sx),dy=(cy-drag.sy);
   // for mouse: require minimum movement before actually moving
   if(!drag.moved){if(Math.abs(dx)<MOUSE_THR&&Math.abs(dy)<MOUSE_THR)return;drag.moved=true}
   const it=S.items.find(i=>i.id===drag.id);if(!it)return;
@@ -281,12 +281,6 @@ function render(){
   const thBtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"14px",padding:"3px 8px"},S.theme==="dark"?"☀️":"🌙");
   thBtn.onclick=()=>{S.theme=S.theme==="dark"?"light":"dark";render()};right.appendChild(thBtn);
 
-  // zoom
-  right.appendChild(h("span","",{fontSize:"10px",color:th.txM},"Z"));
-  const zr=document.createElement("input");zr.type="range";zr.min="0.3";zr.max="1.5";zr.step="0.05";zr.value=S.zoom;
-  zr.style.cssText=`width:55px;accent-color:${th.aBg}`;zr.oninput=e=>{S.zoom=+e.target.value;render()};right.appendChild(zr);
-  right.appendChild(h("span","",{fontSize:"10px",color:th.txS,width:"28px"},Math.round(S.zoom*100)+"%"));
-
   right.appendChild(h("div","",{width:"1px",height:"18px",background:th.hBrd}));
 
   // new board
@@ -306,7 +300,7 @@ function render(){
 
   /* BOARD */
   const board=document.getElementById("board");board.innerHTML="";
-  board.style.cssText=`width:${boardW}px;height:${L.boardH}px;transform:scale(${S.zoom});min-width:${boardW}px`;
+  board.style.cssText=`width:${boardW}px;height:${L.boardH}px;min-width:${boardW}px`;
   domMap.clear();
 
   ACTS.forEach((act,i)=>{
@@ -364,10 +358,10 @@ function render(){
   /* FABs */
   const fabs=document.getElementById("fabs");fabs.innerHTML="";
   const gBtn=h("button","",{width:"44px",height:"44px",borderRadius:"50%",background:"transparent",border:`2px dashed ${th.gBrd}`,cursor:"pointer",fontSize:"18px",color:th.txS,fontWeight:"700"},"⊞");
-  gBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const x=(sa.scrollLeft||0)/S.zoom+100+Math.random()*150;const y=(sa.scrollTop||0)/S.zoom+60+Math.random()*80;S.items.push(mkGroup(x,y,th.gBrd));render()};
+  gBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const x=(sa.scrollLeft||0)+100+Math.random()*150;const y=(sa.scrollTop||0)+60+Math.random()*80;S.items.push(mkGroup(x,y,th.gBrd));render()};
   fabs.appendChild(gBtn);
   const cBtn=h("button","",{width:"52px",height:"52px",borderRadius:"50%",background:th.aBg,border:"none",cursor:"pointer",fontSize:"24px",color:th.aFg,fontWeight:"900",boxShadow:`0 4px 20px ${th.aBg}66`},"＋");
-  cBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const x=(sa.scrollLeft||0)/S.zoom+150+Math.random()*200;const c=mkCard(0,20,x);c.description="新しいシーン";S.items.push(c);render()};
+  cBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const x=(sa.scrollLeft||0)+150+Math.random()*200;const c=mkCard(0,20,x);c.description="新しいシーン";S.items.push(c);render()};
   fabs.appendChild(cBtn);
 
   autoSave();
@@ -517,8 +511,8 @@ function migrateItems(items){
   });
   return items;
 }
-function autoSave(){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,zoom:S.zoom}))}catch{}}
-function autoRestore(){try{const raw=localStorage.getItem(AUTOSAVE_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.items){S.items=migrateItems(d.items);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.zoom)S.zoom=d.zoom}}catch{}}
+function autoSave(){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({projectName:S.name,items:S.items,theme:S.theme}))}catch{}}
+function autoRestore(){try{const raw=localStorage.getItem(AUTOSAVE_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.items){S.items=migrateItems(d.items);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme}}catch{}}
 
 /* ═══ SAVE / LOAD / NEW ═══ */
 let fileHandle=null; // File System Access API handle for overwrite
