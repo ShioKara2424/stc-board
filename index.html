@@ -348,8 +348,9 @@ function render(){
       d.appendChild(top2);
       d.appendChild(h("div","",{flex:"1",padding:"4px 10px 0",fontSize:"12px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1"},empty?"タップで編集":card.description));
       if(!empty){const bot=h("div","",{padding:"0 10px 6px",marginTop:"auto",position:"relative",zIndex:"1"});
-        bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},"+/- "+(card.emotion||"")));
-        bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},">< "+(card.conflict||"")));d.appendChild(bot)}
+        if(!isGhost||card.emotion)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},"+/- "+(card.emotion||"")));
+        if(!isGhost||card.conflict)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},">< "+(card.conflict||"")));
+        if(bot.childNodes.length)d.appendChild(bot)}
       d.appendChild(mkHandle(card,th.hdl));
       d.addEventListener("mousedown",e=>onMouseItemDown(e,card));d.addEventListener("touchstart",e=>onTouchItemDown(e,card));
       d.addEventListener("contextmenu",e=>e.preventDefault());d.addEventListener("dblclick",()=>openCardModal(card));
