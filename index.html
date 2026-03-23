@@ -43,6 +43,324 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans JP',sans
 <script>
 'use strict';
 
+const VERSION="1.2.0";
+
+/* ═══ CONSTANTS ═══ */
+const ACTS=[{id:1,label:"ACT 1",sub:"pp.1–25",color:"#D4A017"},{id:2,label:"ACT 2a",sub:"pp.25–55",color:"#2E8B7A"},{id:3,label:"ACT 2b",sub:"pp.55–75",color:"#B94A2C"},{id:4,label:"ACT 3",sub:"pp.75–110",color:"#6B5CA5"}];
+const CW=160,CH=120,COLS=10,GW=200,GH=160;
+const HEADER_H=46,LANE_PAD=20;
+const boardW=100+COLS*(CW+8)+100;
+
+function layout(){
+  const vh=window.innerHeight-HEADER_H;
+  const laneH=Math.max(130,Math.floor((vh-LANE_PAD)/4));
+  const laneGap=Math.max(2,Math.floor(LANE_PAD/5));
+  return{laneH,laneGap,laneTop:4,boardH:4+4*(laneH+laneGap)+20};
+}
+function laneY(i){const L=layout();return L.laneTop+i*(L.laneH+L.laneGap)}
+
+const THEMES={
+  dark:{bg:"#0a0a12",hBg:"#0d0d18",hBrd:"#1a1a2a",tx:"#e0e0e0",txS:"#888",txM:"#555",cE:"#111119",cET:"#2a2a3a",cT:"#fff",cBrd:"#1e1e2e",iBg:"#1a1a2e",iBrd:"#2a2a3a",mBg:"#12121a",bBg:"#1a1a2e",hdl:"#555",shd:"rgba(0,0,0,.4)",aBg:"#e8b931",aFg:"#000",gBrd:"#888",bCol:"#444",lO:"20"},
+  light:{bg:"#faf8f4",hBg:"#faf8f4",hBrd:"#ddd8cc",tx:"#2c2c2c",txS:"#777",txM:"#aaa",cE:"#e8e4da",cET:"#bbb5a8",cT:"#2c2c2c",cBrd:"#d0cabb",iBg:"#f5f3ee",iBrd:"#d0cabb",mBg:"#faf8f4",bBg:"#e8e4da",hdl:"#bbb",shd:"rgba(0,0,0,.12)",aBg:"#D4A017",aFg:"#fff",gBrd:"#999",bCol:"#888",lO:"12"}
+};
+const PALS={
+  dark:["#0d0d18","#6b2a2a","#6b4a28","#5e5520","#2e5a24","#1e5448","#1e4460","#2e3068","#4a2868","#454545"],
+  light:["#faf8f4","#f2c4c4","#f2d8b8","#f0e8b0","#d4ecc8","#b0e0d4","#c4def0","#b8bce8","#dec8f0","#c8c8c8"]
+};
+const TAG_COLS=["#e05252","#e88a3a","#d4c032","#4ab858","#30b8a0","#4a9ae0","#6a5cd4","#c252c2"];
+
+let _uid=1;
+function uid(){return"c"+_uid+++"_"+Math.random().toString(36).slice(2,6)}
+function inside(px,py,rx,ry,rw,rh){return px>=rx&&px<=rx+rw&&py>=ry&&py<=ry+rh}
+function actFromY(y){const L=layout();for(let i=3;i>=0;i--)if(y>=L.laneTop+i*(L.laneH+L.laneGap)-L.laneGap/2)return ACTS[i];return ACTS[0]}
+function cardAbsY(c){return laneY(c.actIdx!=null?c.actIdx:0)+c.y}
+function cardFromAbs(ay){const L=layout();let a=0;for(let i=3;i>=0;i--)if(ay>=L.laneTop+i*(L.laneH+L.laneGap)-L.laneGap/2){a=i;break}return{actIdx:a,relY:ay-laneY(a)}}
+function mkCard(a,ry,x){return{id:uid(),type:"card",x,y:ry,actIdx:a,w:CW,h:CH,description:"",emotion:"",conflict:"",colorIdx:0,groupId:null,tags:[],ghost:false}}
+function mkGroup(x,ay,c){return{id:uid(),type:"group",x,y:ay,w:GW,h:GH,color:c||"#888",name:"",tags:[]}}
+
+/* ═══ STATE ═══ */
+let S={items:[],name:"新しいプロジェクト",theme:"light",hScale:1,editCard:null,editGroup:null,saveOk:null,dirty:false,highlight:null};
+
+function T(){return THEMES[S.theme]}
+function P(){return PALS[S.theme]}
+function crds(){return S.items.filter(i=>i.type==="card")}
+function grps(){return S.items.filter(i=>i.type==="group")}
+function grpOf(c){const ax=c.x+c.w/2,ay=cardAbsY(c)+c.h/2;return grps().find(g=>inside(ax,ay,g.x,g.y,g.w,g.h))||null}
+function cardEffActIdx(c){
+  if(c.groupId){const g=grps().find(gg=>gg.id===c.groupId);if(g){return ACTS.indexOf(actFromY(g.y+g.h/2))}}
+  return c.actIdx!=null?c.actIdx:0;
+}
+function grpCnt(gId){return crds().filter(c=>c.groupId===gId&&c.description.trim()&&!c.ghost).length}
+function scenes(fn){
+  const cs=fn?crds().filter(fn):crds();const f=cs.filter(c=>c.description.trim()&&!c.ghost);
+  const seen=new Set;let n=0;
+  for(const c of f){const g=grpOf(c);if(g){if(!seen.has(g.id)){seen.add(g.id);n++}}else n++}
+  return n;
+}
+
+/* ═══ UNDO / REDO ═══ */
+const UNDO_MAX=80;
+let undoStack=[],redoStack=[];
+function snapshot(){return JSON.stringify({items:S.items,name:S.name})}
+function pushUndo(){
+  undoStack.push(snapshot());
+  if(undoStack.length>UNDO_MAX)undoStack.shift();
+  redoStack=[];
+  S.dirty=true;
+}
+function doUndo(){
+  if(!undoStack.length)return;
+  redoStack.push(snapshot());
+  const prev=JSON.parse(undoStack.pop());
+  S.items=prev.items;S.name=prev.name;
+  closeModal();render();
+}
+function doRedo(){
+  if(!redoStack.length)return;
+  undoStack.push(snapshot());
+  const next=JSON.parse(redoStack.pop());
+  S.items=next.items;S.name=next.name;
+  closeModal();render();
+}
+
+/* ═══ DOM CACHE ═══ */
+const domMap=new Map();
+
+/* ═══ DOUBLE TAP ═══ */
+let lastTap={id:null,time:0};
+function checkDblTap(item){const now=Date.now();if(lastTap.id===item.id&&now-lastTap.time<400){lastTap={id:null,time:0};return true}lastTap={id:item.id,time:now};return false}
+
+/* ═══ DRAG — PC: immediate drag, Touch: long-press ═══ */
+const HOLD_MS=280,HOLD_THR=8,MOUSE_THR=3;
+let drag=null,rsz=null,hold=null;
+function gp(ev){const p=ev.touches?ev.touches[0]:ev;return{cx:p.clientX,cy:p.clientY}}
+
+/* PC mouse: immediate drag with move threshold */
+function onMouseItemDown(ev,item){
+  if(rsz||ev.button!==0)return;
+  ev.preventDefault();ev.stopPropagation();
+  S.highlight=null;
+  const{cx,cy}=gp(ev);
+  const absY=item.type==="card"?cardAbsY(item):item.y;
+  pushUndo();
+  drag={id:item.id,type:item.type,sx:cx,sy:cy,ox:item.x,oy:absY,moved:false,ldx:0,ldy:0};
+}
+
+/* Touch: long-press to enter drag */
+function onTouchItemDown(ev,item){
+  if(rsz)return;
+  ev.stopPropagation();
+  S.highlight=null;
+  const{cx,cy}=gp(ev);
+  const absY=item.type==="card"?cardAbsY(item):item.y;
+  hold={id:item.id,type:item.type,sx:cx,sy:cy,ox:item.x,oy:absY,
+    timer:setTimeout(()=>{
+      if(!hold||hold.id!==item.id)return;
+      pushUndo();
+      drag={id:item.id,type:item.type,sx:hold.sx,sy:hold.sy,ox:hold.ox,oy:hold.oy,moved:false,ldx:0,ldy:0};
+      hold=null;
+      const el=domMap.get(item.id);
+      if(el){el.style.outline="3px solid #e8b931";el.style.opacity="0.85";el.style.zIndex="9999"}
+    },HOLD_MS)};
+}
+
+function onMove(ev){
+  if(rsz){
+    ev.preventDefault();const{cx,cy}=gp(ev);
+    const it=S.items.find(i=>i.id===rsz.id);if(!it)return;
+    it.w=Math.max(100,rsz.ow+(cx-rsz.sx)/S.hScale);it.h=Math.max(70,rsz.oh+(cy-rsz.sy));
+    const el=domMap.get(it.id);if(el){el.style.width=it.w+"px";el.style.height=it.h+"px"}
+    return;
+  }
+  if(hold){
+    const{cx,cy}=gp(ev);
+    if(Math.abs(cx-hold.sx)>HOLD_THR||Math.abs(cy-hold.sy)>HOLD_THR){clearTimeout(hold.timer);hold=null}
+    return;
+  }
+  if(!drag)return;
+  ev.preventDefault();
+  const{cx,cy}=gp(ev);
+  const dx=(cx-drag.sx)/S.hScale,dy=(cy-drag.sy);
+  // for mouse: require minimum movement before actually moving
+  if(!drag.moved){if(Math.abs(dx)<MOUSE_THR&&Math.abs(dy)<MOUSE_THR)return;drag.moved=true}
+  const it=S.items.find(i=>i.id===drag.id);if(!it)return;
+  const nx=drag.ox+dx,ny=drag.oy+dy;
+  if(it.type==="card"){
+    const{actIdx,relY}=cardFromAbs(ny);it.actIdx=actIdx;it.y=relY;it.x=nx;
+    const el=domMap.get(it.id);if(el){el.style.left=nx+"px";el.style.top=cardAbsY(it)+"px";el.style.zIndex="9999"}
+  }else{
+    it.x=nx;it.y=ny;
+    const el=domMap.get(it.id);if(el){el.style.left=nx+"px";el.style.top=ny+"px";el.style.zIndex="9998"}
+    const ddx=nx-drag.ox-drag.ldx,ddy=ny-drag.oy-drag.ldy;drag.ldx=nx-drag.ox;drag.ldy=ny-drag.oy;
+    S.items.forEach(c=>{if(c.type==="card"&&c.groupId===it.id){
+      const nay=cardAbsY(c)+ddy;const{actIdx,relY}=cardFromAbs(nay);c.actIdx=actIdx;c.y=relY;c.x+=ddx;
+      const ce=domMap.get(c.id);if(ce){ce.style.left=c.x+"px";ce.style.top=cardAbsY(c)+"px"}}});
+  }
+}
+
+function onEnd(ev){
+  // touch long-press hold release → double-tap check
+  if(hold){clearTimeout(hold.timer);const hid=hold.id;hold=null;
+    const it=S.items.find(i=>i.id===hid);
+    if(it&&checkDblTap(it)){it.type==="card"?openCardModal(it):openGroupModal(it)}
+    return;
+  }
+  if(rsz){rsz=null;render();return}
+  if(!drag)return;
+  const d=drag;drag=null;
+  const el=domMap.get(d.id);if(el){el.style.outline="";el.style.opacity=""}
+  const it=S.items.find(i=>i.id===d.id);
+  // mouse: if didn't move, this was a click → open modal
+  if(!d.moved){
+    if(it){
+      const isTouch=ev&&ev.type&&ev.type.startsWith("touch");
+      if(!isTouch){it.type==="card"?openCardModal(it):openGroupModal(it)}
+    }
+    render();return;
+  }
+  if(!it){render();return}
+  if(it.type==="card"){const ax=it.x+it.w/2,ay=cardAbsY(it)+it.h/2;const g=S.items.find(i=>i.type==="group"&&inside(ax,ay,i.x,i.y,i.w,i.h));it.groupId=g?g.id:null}
+  if(it.type==="group"){S.items.forEach(i=>{if(i.type!=="card")return;const ax=i.x+i.w/2,ay=cardAbsY(i)+i.h/2;if(inside(ax,ay,it.x,it.y,it.w,it.h))i.groupId=it.id;else if(i.groupId===it.id)i.groupId=null})}
+  render();
+}
+
+window.addEventListener("mousemove",onMove);
+window.addEventListener("mouseup",onEnd);
+window.addEventListener("touchmove",onMove,{passive:false});
+window.addEventListener("touchend",onEnd);
+window.addEventListener("resize",()=>render());
+window.addEventListener("keydown",e=>{
+  const mod=e.ctrlKey||e.metaKey;
+  // allow Ctrl+Z/Y even in inputs? No — skip if in input
+  if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"){
+    // but still handle Ctrl+S in inputs (save shouldn't be blocked)
+    if(mod&&e.key==="s"){e.preventDefault();if(e.shiftKey)doSaveAs();else doSave()}
+    return;
+  }
+  if(mod&&e.key==="z"){e.preventDefault();if(e.shiftKey)doRedo();else doUndo()}
+  if(mod&&e.key==="y"){e.preventDefault();doRedo()}
+  if(mod&&e.key==="s"){e.preventDefault();if(e.shiftKey)doSaveAs();else doSave()}
+});
+
+function startResize(ev,item){ev.preventDefault();ev.stopPropagation();S.highlight=null;pushUndo();const{cx,cy}=gp(ev);rsz={id:item.id,sx:cx,sy:cy,ow:item.w,oh:item.h}}
+
+/* ═══ RENDER ═══ */
+function h(tag,cls,style,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(style)Object.assign(e.style,style);if(txt!=null)e.textContent=txt;return e}
+
+function render(){
+  const th=T(),pl=P(),L=layout();
+  document.body.style.background=th.bg;
+  document.querySelector('meta[name="theme-color"]').content=th.aBg;
+
+  /* HEADER */
+  const hdr=document.getElementById("header");hdr.innerHTML="";
+  hdr.style.cssText=`background:${th.hBg};border-bottom:1px solid ${th.hBrd};color:${th.tx}`;
+
+  const left=h("div","",{display:"flex",alignItems:"center",gap:"8px"});
+  left.appendChild(h("span","",{fontSize:"20px"},"🐱"));
+  const title=h("span","",{fontSize:"15px",fontWeight:"700",cursor:"pointer"},S.name);
+  title.onclick=()=>{const v=prompt("プロジェクト名",S.name);if(v!=null){pushUndo();S.name=v;render()}};
+  left.appendChild(title);
+  left.appendChild(h("span","",{fontSize:"11px",color:th.txS,background:th.bBg,padding:"2px 8px",borderRadius:"12px"},scenes()+" シーン"));
+
+  // info button
+  const infoBtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"13px",padding:"3px 8px",borderRadius:"50%",width:"26px",height:"26px"},"ⓘ");
+  infoBtn.onclick=()=>showInfo();
+  left.appendChild(infoBtn);
+  hdr.appendChild(left);
+
+  const right=h("div","",{display:"flex",gap:"5px",alignItems:"center",flexWrap:"wrap"});
+
+  // undo/redo
+  const ubtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:undoStack.length?th.txS:th.txM,fontSize:"15px",padding:"3px 8px"},"↩");
+  ubtn.onclick=doUndo;ubtn.title="元に戻す";right.appendChild(ubtn);
+  const rbtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:redoStack.length?th.txS:th.txM,fontSize:"15px",padding:"3px 8px"},"↪");
+  rbtn.onclick=doRedo;rbtn.title="やり直し";right.appendChild(rbtn);
+
+  right.appendChild(h("div","",{width:"1px",height:"18px",background:th.hBrd}));
+
+  // theme
+  const thBtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"14px",padding:"3px 8px"},S.theme==="dark"?"☀️":"🌙");
+  thBtn.onclick=()=>{S.theme=S.theme==="dark"?"light":"dark";render()};right.appendChild(thBtn);
+
+  // horizontal scale
+  const hsMinus=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:S.hScale>0.5?th.txS:th.txM,fontSize:"13px",padding:"3px 7px",fontWeight:"700"},"−");
+  hsMinus.onclick=()=>{if(S.hScale>0.5){S.hScale=Math.round((S.hScale-0.1)*10)/10;render()}};right.appendChild(hsMinus);
+  right.appendChild(h("span","",{fontSize:"10px",color:th.txS,minWidth:"28px",textAlign:"center"},Math.round(S.hScale*100)+"%"));
+  const hsPlus=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:S.hScale<2?th.txS:th.txM,fontSize:"13px",padding:"3px 7px",fontWeight:"700"},"＋");
+  hsPlus.onclick=()=>{if(S.hScale<2){S.hScale=Math.round((S.hScale+0.1)*10)/10;render()}};right.appendChild(hsPlus);
+
+  right.appendChild(h("div","",{width:"1px",height:"18px",background:th.hBrd}));
+
+  // new board
+  const nb=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"12px"},"📄新規");
+  nb.onclick=doNew;right.appendChild(nb);
+
+  // save (overwrite) / save-as / load
+  const sv=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS},(S.saveOk==="ok"?"✅":"💾")+(fileHandle?" 上書保存":" 保存"));
+  sv.onclick=doSave;sv.title="上書き保存 (Ctrl+S)";right.appendChild(sv);
+  if(hasFS){
+    const sa=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"11px"},"別名保存");
+    sa.onclick=doSaveAs;sa.title="名前を付けて保存 (Ctrl+Shift+S)";right.appendChild(sa);
+  }
+  const ld=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS},"📂");
+  ld.onclick=doLoad;ld.title="ファイル読込";right.appendChild(ld);
+  hdr.appendChild(right);
+
+  /* BOARD */
+  const board=document.getElementById("board");board.innerHTML="";
+  const scaledW=Math.ceil(boardW*S.hScale);
+  board.style.cssText=`width:${boardW}px;height:${L.boardH}px;transform:scaleX(${S.hScale});transform-origin:top left`;
+  domMap.clear();
+  /* ensure scrollArea has correct horizontal scroll range */
+  const sa2=document.getElementById("scrollArea");
+  let spacer=document.getElementById("hScaleSpacer");
+  if(!spacer){spacer=document.createElement("div");spacer.id="hScaleSpacer";spacer.style.cssText="position:absolute;top:0;left:0;height:1px;pointer-events:none";sa2.appendChild(spacer)}
+  spacer.style.width=scaledW+"px";
+
+  ACTS.forEach((act,i)=>{
+    const ly=laneY(i);
+    const lane=h("div","",{position:"absolute",left:0,right:0,top:ly+"px",height:L.laneH+"px",background:act.color+th.lO,borderLeft:`4px solid ${act.color}44`,pointerEvents:"none"});
+    const info=h("div","",{position:"absolute",left:"12px",top:"6px",display:"flex",alignItems:"center",gap:"8px"});
+    info.appendChild(h("span","",{fontWeight:"900",fontSize:"13px",color:act.color,fontFamily:"inherit"},act.label));
+    info.appendChild(h("span","",{fontSize:"10px",color:th.txM},act.sub));
+    info.appendChild(h("span","",{fontSize:"10px",color:th.txS,background:th.bBg,padding:"1px 6px",borderRadius:"8px"},""+scenes(c=>cardEffActIdx(c)===i)));
+    lane.appendChild(info);board.appendChild(lane);
+  });
+
+  const sorted=[...grps().sort((a,b)=>a.y-b.y),...crds().sort((a,b)=>cardAbsY(a)-cardAbsY(b))];
+  sorted.forEach((item,zi)=>{
+    const d=document.createElement("div");d.className="item "+(item.type==="card"?"card":"group");domMap.set(item.id,d);
+    if(item.type==="group"){
+      const hlG=S.highlight===item.id;
+      d.style.cssText=`left:${item.x}px;top:${item.y}px;width:${item.w}px;height:${item.h}px;z-index:${zi+1};border:2px dashed ${item.color};border-radius:14px;background:${item.color}${th.lO}${hlG?`;outline:3px solid ${th.aBg};outline-offset:2px`:""}`;
+      const cc=grpCnt(item.id);
+      d.appendChild(h("div","",{position:"absolute",top:"-10px",left:"10px",background:item.color,color:"#fff",fontSize:"10px",fontWeight:"700",padding:"1px 8px",borderRadius:"6px"},(item.name||"グループ")+(cc>0?` (${cc}枚→1シーン)`:"")));
+      /* tag lines at bottom of group */
+      if(item.tags&&item.tags.length>0){const tbar=h("div","",{display:"flex",flexDirection:"column",position:"absolute",bottom:"0",left:"0",right:"0",borderRadius:"0 0 12px 12px",overflow:"hidden"});[...item.tags].sort((a,b)=>a-b).forEach(ti=>{tbar.appendChild(h("div","",{height:"3px",background:TAG_COLS[ti]||TAG_COLS[0]}))});d.appendChild(tbar)}
+      d.appendChild(mkHandle(item,item.color));
+      d.addEventListener("mousedown",e=>onMouseItemDown(e,item));d.addEventListener("touchstart",e=>onTouchItemDown(e,item));
+      d.addEventListener("contextmenu",e=>e.preventDefault());d.addEventListener("dblclick",()=>openGroupModal(item));
+    }else{
+      const card=item,ay=cardAbsY(card),empty=!card.description.trim(),act=ACTS[cardEffActIdx(card)]||ACTS[0];
+      const bg=empty?th.cE:pl[card.colorIdx!=null?card.colorIdx:0],gs2=grps(),inG=card.groupId&&gs2.some(g=>g.id===card.groupId);
+      const gc=inG?gs2.find(g=>g.id===card.groupId)?.color||th.cBrd:null;
+      const isGhost=!!card.ghost;
+      const hlC=S.highlight===card.id;
+      const borderStyle=isGhost?"2.5px dashed":(inG?"2.5px solid":"1.5px solid");
+      const borderColor=inG?gc:th.bCol;
+      d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${zi+1};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`};position:absolute${hlC?`;outline:3px solid ${th.aBg};outline-offset:2px`:""}`;
+      /* background layer with opacity for ghost */
+      const bgLayer=h("div","",{position:"absolute",inset:"0",backg
+        <div id="app">
+  <div id="header"></div>
+  <div id="scrollArea"><div id="board"></div></div>
+  <div id="fabs"></div>
+</div>
+<div id="modalContainer"></div>
+<script>
+'use strict';
+
 const VERSION="1.1.5";
 
 /* ═══ CONSTANTS ═══ */
