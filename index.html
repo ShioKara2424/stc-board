@@ -351,4 +351,267 @@ function render(){
       const borderColor=inG?gc:th.bCol;
       d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${zi+1};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`};position:absolute${hlC?`;outline:3px solid ${th.aBg};outline-offset:2px`:""}`;
       /* background layer with opacity for ghost */
-      const bgLayer=h("div","",{position:"absolute",inset:"0",backg
+      const bgLayer=h("div","",{position:"absolute",inset:"0",background:bg,opacity:isGhost?"0.7":"1",borderRadius:"3px",pointerEvents:"none",zIndex:"0"});
+      d.appendChild(bgLayer);
+      /* tag lines at top */
+      if(card.tags&&card.tags.length>0){const tbar=h("div","",{display:"flex",flexDirection:"column",position:"absolute",top:"0",left:"0",right:"0",zIndex:"1"});[...card.tags].sort((a,b)=>a-b).forEach(ti=>{tbar.appendChild(h("div","",{height:"3px",background:TAG_COLS[ti]||TAG_COLS[0]}))});d.appendChild(tbar)}
+      const top2=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px 0",position:"relative",zIndex:"1"});
+      top2.appendChild(h("div","",{width:"7px",height:"7px",borderRadius:"4px",background:act.color,flexShrink:"0"}));
+      if(inG)top2.appendChild(h("span","",{fontSize:"9px",color:gc,fontWeight:"700"},"GRP"));
+      d.appendChild(top2);
+      d.appendChild(h("div","",{flex:"1",padding:"4px 10px 0",fontSize:"12px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1"},empty?"タップで編集":card.description));
+      if(!empty){const bot=h("div","",{padding:"0 10px 6px",marginTop:"auto",position:"relative",zIndex:"1"});
+        if(!isGhost||card.emotion)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},"+/- "+(card.emotion||"")));
+        if(!isGhost||card.conflict)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},">< "+(card.conflict||"")));
+        if(bot.childNodes.length)d.appendChild(bot)}
+      d.appendChild(mkHandle(card,th.hdl));
+      d.addEventListener("mousedown",e=>onMouseItemDown(e,card));d.addEventListener("touchstart",e=>onTouchItemDown(e,card));
+      d.addEventListener("contextmenu",e=>e.preventDefault());d.addEventListener("dblclick",()=>openCardModal(card));
+    }
+    board.appendChild(d);
+  });
+
+  document.getElementById("scrollArea").style.background=th.bg;
+
+  /* FABs */
+  const fabs=document.getElementById("fabs");fabs.innerHTML="";
+  const gBtn=h("button","",{width:"44px",height:"44px",borderRadius:"50%",background:"transparent",border:`2px dashed ${th.gBrd}`,cursor:"pointer",fontSize:"18px",color:th.txS,fontWeight:"700"},"⊞");
+  gBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const vw=sa.clientWidth,vh=sa.clientHeight;const x=((sa.scrollLeft||0)+vw-GW*S.hScale-100)/S.hScale+Math.random()*80-40;const y=(sa.scrollTop||0)+vh-GH-80+Math.random()*60-30;const g=mkGroup(x,y,th.gBrd);S.items.push(g);S.highlight=g.id;render()};
+  fabs.appendChild(gBtn);
+  const cBtn=h("button","",{width:"52px",height:"52px",borderRadius:"50%",background:th.aBg,border:"none",cursor:"pointer",fontSize:"24px",color:th.aFg,fontWeight:"900",boxShadow:`0 4px 20px ${th.aBg}66`},"＋");
+  cBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const vw=sa.clientWidth,vh=sa.clientHeight;const x=((sa.scrollLeft||0)+vw-CW*S.hScale-100)/S.hScale+Math.random()*80-40;const ay=(sa.scrollTop||0)+vh-CH-80+Math.random()*60-30;const{actIdx,relY}=cardFromAbs(ay);const c=mkCard(actIdx,relY,x);c.description="新しいシーン";S.items.push(c);S.highlight=c.id;render()};
+  fabs.appendChild(cBtn);
+
+  autoSave();
+}
+
+function openCardModal(c){S.highlight=null;S.editCard=c;document.getElementById("modalContainer").innerHTML="";document.getElementById("modalContainer").appendChild(cardModal())}
+function openGroupModal(g){S.highlight=null;S.editGroup=g;document.getElementById("modalContainer").innerHTML="";document.getElementById("modalContainer").appendChild(groupModal())}
+function closeModal(){S.editCard=null;S.editGroup=null;document.getElementById("modalContainer").innerHTML="";autoSave()}
+
+function mkHandle(item,color){
+  const d=document.createElement("div");d.className="resize-handle";
+  d.innerHTML=`<svg width="10" height="10" viewBox="0 0 10 10"><line x1="9" y1="1" x2="1" y2="9" stroke="${color}" stroke-width="1.2"/><line x1="9" y1="4" x2="4" y2="9" stroke="${color}" stroke-width="1.2"/><line x1="9" y1="7" x2="7" y2="9" stroke="${color}" stroke-width="1.2"/></svg>`;
+  d.addEventListener("mousedown",e=>startResize(e,item));d.addEventListener("touchstart",e=>startResize(e,item),{passive:false});return d;
+}
+
+/* ═══ INFO MODAL ═══ */
+function showInfo(){
+  const th=T();
+  const ov=h("div","modal-overlay");
+  const box=h("div","modal-box",{background:th.mBg,border:`1px solid ${th.iBrd}`,color:th.tx,boxShadow:`0 24px 80px ${th.shd}`,width:"360px"});
+  ["click","mousedown","touchstart","touchend","pointerdown"].forEach(evt=>box.addEventListener(evt,e=>e.stopPropagation()));
+  ov.addEventListener("mousedown",e=>{if(e.target===ov)ov.remove()});
+  ov.addEventListener("touchend",e=>{if(e.target===ov)ov.remove()});
+  box.appendChild(h("h3","",{},"操作ガイド"));
+  const lines=[
+    "【カード】",
+    "・PC: ドラッグ → 移動 / クリック → 編集",
+    "・タブレット: タップ×2 → 編集 / 長押し→ドラッグ → 移動",
+    "・右下の⟋をドラッグ → サイズ変更",
+    "・編集画面の🗑ボタン → 削除",
+    "",
+    "【グループ】",
+    "・点線の枠。カードをグループ内に入れると結合",
+    "・グループ内のカードは何枚でも1シーン",
+    "・グループ移動で中のカードも移動",
+    "",
+    "【ヘッダー】",
+    "・↩↪ または Ctrl+Z/Y → 元に戻す/やり直し",
+    "・📄新規 → 新しいボードを作成",
+    "・💾保存 / Ctrl+S → 上書き保存（PC）",
+    "・別名保存 / Ctrl+Shift+S → 名前を付けて保存",
+    "・📂 → JSONファイルを読み込み",
+    "",
+    "v"+VERSION
+  ];
+  const content=h("div","",{fontSize:"13px",lineHeight:"1.8",color:th.txS});
+  lines.forEach(l=>content.appendChild(h("div","",{},l||"\u00A0")));
+  box.appendChild(content);
+  const close=h("button","btn",{background:th.aBg,color:th.aFg,marginTop:"16px",width:"100%"},"閉じる");
+  close.onclick=()=>ov.remove();box.appendChild(close);
+  ov.appendChild(box);document.getElementById("modalContainer").appendChild(ov);
+}
+
+/* ═══ CARD MODAL ═══ */
+function mkTagPicker(tags,th){
+  const wrap=h("div","",{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"});
+  TAG_COLS.forEach((tc,idx)=>{
+    const sel=tags.includes(idx);
+    const dot=h("div","",{width:"28px",height:"28px",borderRadius:"6px",cursor:"pointer",background:tc,border:sel?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`,opacity:sel?"1":"0.4",transition:"opacity .15s"});
+    dot.onclick=()=>{const i=tags.indexOf(idx);if(i>=0)tags.splice(i,1);else tags.push(idx);wrap.querySelectorAll("div").forEach((d,di)=>{const s=tags.includes(di);d.style.border=s?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`;d.style.opacity=s?"1":"0.4"})};
+    wrap.appendChild(dot);
+  });
+  return wrap;
+}
+function cardModal(){
+  const card=S.editCard,th=T(),pl=P();
+  let desc=card.description,emo=card.emotion,conf=card.conflict,col=card.colorIdx!=null?card.colorIdx:0;
+  let tags=[...(card.tags||[])],ghost=!!card.ghost;
+  const ov=h("div","modal-overlay");
+  const box=h("div","modal-box",{background:th.mBg,border:`1px solid ${th.iBrd}`,color:th.tx,boxShadow:`0 24px 80px ${th.shd}`,width:"480px"});
+  ["click","mousedown","touchstart","touchend","pointerdown"].forEach(evt=>box.addEventListener(evt,e=>e.stopPropagation()));
+  ov.addEventListener("mousedown",e=>{if(e.target===ov){closeModal();render()}});
+  ov.addEventListener("touchend",e=>{if(e.target===ov){closeModal();render()}});
+  box.appendChild(h("h3","",{},"カード編集"));
+  box.appendChild(h("label","",{color:th.txS},"説明"));
+  const ta=document.createElement("textarea");ta.style.cssText=`background:${th.iBg};border:1px solid ${th.iBrd};color:${th.tx}`;ta.value=desc;ta.oninput=e=>desc=e.target.value;box.appendChild(ta);
+  const row=h("div","",{display:"flex",gap:"12px"});
+  const d1=h("div","",{flex:"1"});d1.appendChild(h("label","",{color:th.txS},"+/− 感情"));
+  const i1=document.createElement("input");i1.type="text";i1.style.cssText=`width:100%;background:${th.iBg};border:1px solid ${th.iBrd};color:${th.tx};border-radius:8px;padding:8px 10px;font-size:14px;outline:none`;i1.value=emo;i1.placeholder="+ / −";i1.oninput=e=>emo=e.target.value;d1.appendChild(i1);row.appendChild(d1);
+  const d2=h("div","",{flex:"1"});d2.appendChild(h("label","",{color:th.txS},">< 葛藤"));
+  const i2=document.createElement("input");i2.type="text";i2.style.cssText=i1.style.cssText;i2.value=conf;i2.placeholder="対立・葛藤";i2.oninput=e=>conf=e.target.value;d2.appendChild(i2);row.appendChild(d2);
+  box.appendChild(row);
+  box.appendChild(h("label","",{color:th.txS},"カラー"));
+  const pd=h("div","",{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"});
+  pl.forEach((pc,idx)=>{const dot=h("div","pdot",{background:pc,border:col===idx?`2px solid ${th.tx}`:`2px solid ${th.cBrd}`});dot.onclick=()=>{col=idx;pd.querySelectorAll(".pdot").forEach(d=>d.style.border=`2px solid ${th.cBrd}`);dot.style.border=`2px solid ${th.tx}`};pd.appendChild(dot)});box.appendChild(pd);
+  box.appendChild(h("label","",{color:th.txS},"タグ"));
+  box.appendChild(mkTagPicker(tags,th));
+  /* ghost checkbox */
+  const ghostRow=document.createElement("label");ghostRow.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer";
+  const gc=document.createElement("input");gc.type="checkbox";gc.checked=ghost;gc.style.cssText="width:18px;height:18px;cursor:pointer;accent-color:#888";gc.onchange=e=>ghost=e.target.checked;
+  ghostRow.appendChild(gc);ghostRow.appendChild(h("span","",{fontSize:"13px",color:th.txS},"ゴースト（点線枠・シーンカウント除外）"));
+  box.appendChild(ghostRow);
+  const btns=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center"});
+  const del=h("button","btn",{background:"#c0392b",color:"#fff",fontSize:"13px",padding:"8px 14px"},"🗑 削除");
+  del.onclick=()=>{if(confirm("このカードを削除しますか？")){pushUndo();S.items=S.items.filter(i=>i.id!==card.id);closeModal();render()}};btns.appendChild(del);
+  const rb=h("div","",{display:"flex",gap:"10px"});
+  const cb=h("button","btn",{background:th.iBrd,color:th.tx},"キャンセル");cb.onclick=()=>{closeModal();render()};
+  const sb=h("button","btn",{background:th.aBg,color:th.aFg},"保存");
+  sb.onclick=()=>{pushUndo();Object.assign(card,{description:desc,emotion:emo,conflict:conf,colorIdx:col,tags,ghost});closeModal();render()};
+  rb.appendChild(cb);rb.appendChild(sb);btns.appendChild(rb);box.appendChild(btns);ov.appendChild(box);return ov;
+}
+
+/* ═══ GROUP MODAL ═══ */
+function groupModal(){
+  const group=S.editGroup,th=T(),pl=P();let col=group.color,gname=group.name||"";
+  let tags=[...(group.tags||[])];
+  const ov=h("div","modal-overlay");
+  const box=h("div","modal-box",{background:th.mBg,border:`1px solid ${th.iBrd}`,color:th.tx,width:"480px",boxShadow:`0 24px 80px ${th.shd}`});
+  ["click","mousedown","touchstart","touchend","pointerdown"].forEach(evt=>box.addEventListener(evt,e=>e.stopPropagation()));
+  ov.addEventListener("mousedown",e=>{if(e.target===ov){closeModal();render()}});
+  ov.addEventListener("touchend",e=>{if(e.target===ov){closeModal();render()}});
+  box.appendChild(h("h3","",{},"グループ編集"));
+  box.appendChild(h("label","",{color:th.txS},"名前"));
+  const ni=document.createElement("input");ni.type="text";ni.style.cssText=`width:100%;background:${th.iBg};border:1px solid ${th.iBrd};color:${th.tx};border-radius:8px;padding:8px 10px;font-size:14px;outline:none;margin-bottom:12px`;
+  ni.value=gname;ni.placeholder="グループ名";ni.oninput=e=>gname=e.target.value;box.appendChild(ni);
+  box.appendChild(h("label","",{color:th.txS},"カラー"));
+  const pd=h("div","",{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"});
+  pl.forEach(pc=>{const dot=h("div","pdot",{background:pc,border:col===pc?`2px solid ${th.tx}`:`2px solid ${th.cBrd}`});dot.onclick=()=>{col=pc;pd.querySelectorAll(".pdot").forEach(d=>d.style.border=`2px solid ${th.cBrd}`);dot.style.border=`2px solid ${th.tx}`};pd.appendChild(dot)});box.appendChild(pd);
+  box.appendChild(h("label","",{color:th.txS},"タグ"));
+  box.appendChild(mkTagPicker(tags,th));
+  const btns=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center"});
+  const del=h("button","btn",{background:"#c0392b",color:"#fff",fontSize:"13px",padding:"8px 14px"},"🗑 削除");
+  del.onclick=()=>{if(confirm("このグループを削除しますか？")){pushUndo();S.items.forEach(i=>{if(i.type==="card"&&i.groupId===group.id)i.groupId=null});S.items=S.items.filter(i=>i.id!==group.id);closeModal();render()}};btns.appendChild(del);
+  const rb=h("div","",{display:"flex",gap:"10px"});
+  const cb=h("button","btn",{background:th.iBrd,color:th.tx},"キャンセル");cb.onclick=()=>{closeModal();render()};
+  const ob=h("button","btn",{background:th.aBg,color:th.aFg},"OK");ob.onclick=()=>{pushUndo();group.color=col;group.name=gname;group.tags=tags;closeModal();render()};
+  rb.appendChild(cb);rb.appendChild(ob);btns.appendChild(rb);box.appendChild(btns);ov.appendChild(box);return ov;
+}
+
+/* ═══ AUTOSAVE ═══ */
+const AUTOSAVE_KEY="stc_board_autosave";
+/* migrate old hex color to colorIdx */
+function migrateItems(items){
+  const oldHex=["#a8c4d8","#a8d5ba","#d4b896","#c4a8d4","#d4a8a8","#8ecdc2","#dcc87a","#d9a88a","#9abac4","#b8b8b8",
+    "#1a1a2e","#16213e","#0f3460","#533483","#e94560","#1b998b","#e8b931","#c75b39","#2d4059","#444444",
+    "#bdd3e2","#bee3cc","#e2ceb2","#d5bee2","#e2bebe","#adddd4","#e8d9a0","#e5c0a8","#b5ced6","#cccccc",
+    "#252540","#1f2e50","#184070","#604098","#b8354c","#157a6e","#b89428","#9e482e","#384d6a","#525252"];
+  items.forEach(i=>{
+    if(i.type==="card"&&i.colorIdx==null){
+      const hex=(i.color||"").toLowerCase();
+      let idx=oldHex.indexOf(hex);if(idx>=10)idx=idx%10;
+      i.colorIdx=idx>=0?idx:0;
+      delete i.color;
+    }
+    if(!i.tags)i.tags=[];
+    if(i.type==="card"&&i.ghost==null)i.ghost=false;
+  });
+  return items;
+}
+function autoSave(){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,hScale:S.hScale}))}catch{}}
+function autoRestore(){try{const raw=localStorage.getItem(AUTOSAVE_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.items){S.items=migrateItems(d.items);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.hScale)S.hScale=d.hScale}}catch{}}
+
+/* ═══ SAVE / LOAD / NEW ═══ */
+let fileHandle=null; // File System Access API handle for overwrite
+const hasFS=!!window.showSaveFilePicker; // PC Chrome/Brave/Edge
+
+function saveJSON(){
+  return JSON.stringify({projectName:S.name,items:S.items,theme:S.theme},null,2);
+}
+function safeName(){return(S.name||"board").replace(/[^\w\u3000-\u9FFF-]/g,"_")||"board"}
+
+/* overwrite save (Ctrl+S) — uses existing file handle or falls back to save-as */
+async function doSave(){
+  const j=saveJSON();
+  if(hasFS&&fileHandle){
+    try{
+      const w=await fileHandle.createWritable();
+      await w.write(j);await w.close();
+      S.dirty=false;S.saveOk="ok";render();setTimeout(()=>{S.saveOk=null;render()},2000);
+      return;
+    }catch{}
+  }
+  // no handle yet or API unavailable → save-as
+  doSaveAs();
+}
+
+/* save-as (Ctrl+Shift+S) — always prompts for location */
+async function doSaveAs(){
+  const j=saveJSON();
+  if(hasFS){
+    try{
+      fileHandle=await window.showSaveFilePicker({suggestedName:safeName()+".json",types:[{description:"JSON",accept:{"application/json":[".json"]}}]});
+      const w=await fileHandle.createWritable();
+      await w.write(j);await w.close();
+      S.dirty=false;S.saveOk="ok";render();setTimeout(()=>{S.saveOk=null;render()},2000);
+      return;
+    }catch(e){if(e.name==="AbortError")return}
+  }
+  // fallback: download link (Android, older browsers)
+  try{
+    const b=new Blob([j],{type:"application/json;charset=utf-8"});const u=URL.createObjectURL(b);
+    const a=document.createElement("a");a.href=u;a.download=safeName()+".json";a.style.cssText="position:fixed;left:-9999px";
+    document.body.appendChild(a);setTimeout(()=>{a.click();setTimeout(()=>{URL.revokeObjectURL(u);document.body.removeChild(a)},500)},0);
+    S.dirty=false;S.saveOk="ok";render();setTimeout(()=>{S.saveOk=null;render()},2000);
+  }catch{S.saveOk="err";render();setTimeout(()=>{S.saveOk=null;render()},3000)}
+}
+
+async function doLoad(){
+  if(hasFS){
+    try{
+      const[fh]=await window.showOpenFilePicker({types:[{description:"JSON",accept:{"application/json":[".json"]}}],multiple:false});
+      const file=await fh.getFile();
+      const txt=await file.text();
+      const d=JSON.parse(txt);
+      pushUndo();
+      if(d.items)S.items=migrateItems(d.items);else if(d.cards)S.items=migrateItems(d.cards);
+      if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;
+      fileHandle=fh; // remember handle for overwrite
+      S.dirty=false;render();return;
+    }catch(e){if(e.name==="AbortError")return}
+  }
+  // fallback
+  const inp=document.createElement("input");inp.type="file";inp.accept=".json";inp.style.cssText="position:fixed;left:-9999px";
+  document.body.appendChild(inp);
+  inp.onchange=e=>{const f=e.target.files?.[0];if(!f)return dn();
+    const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);pushUndo();if(d.items)S.items=migrateItems(d.items);else if(d.cards)S.items=migrateItems(d.cards);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;S.dirty=false;fileHandle=null}catch{alert("読み込み失敗")}dn();render()};
+    r.onerror=()=>{alert("読み込み失敗");dn()};r.readAsText(f)};
+  function dn(){try{document.body.removeChild(inp)}catch{}}
+  setTimeout(()=>inp.click(),0);
+}
+
+function doNew(){
+  if(S.dirty&&S.items.length>0){if(!confirm("現在のボードは保存されていません。新しいボードを作成しますか？"))return}
+  pushUndo();
+  S.items=[];S.name="新しいプロジェクト";S.dirty=false;fileHandle=null;
+  undoStack=[];redoStack=[];
+  render();
+}
+
+/* ═══ INIT ═══ */
+autoRestore();render();
+if("serviceWorker"in navigator)navigator.serviceWorker.register("./sw.js").catch(()=>{});
+</script>
+</body>
+</html>
