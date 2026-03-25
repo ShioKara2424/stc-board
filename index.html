@@ -359,7 +359,7 @@ function render(){
       /* tag lines removed — tags shown as symbols */
       /* ACT indicator: diagonal line at top-left corner, overflows card (clipped by overflow:hidden) */
       const actLine=document.createElement("div");
-      actLine.style.cssText=`position:absolute;top:-4px;left:-11px;z-index:2;pointer-events:none`;
+      actLine.style.cssText=`position:absolute;top:-8px;left:-14px;z-index:2;pointer-events:none`;
       actLine.innerHTML=`<svg width="32" height="32" viewBox="0 0 32 32"><line x1="2" y1="30" x2="30" y2="2" stroke="${act.color}" stroke-width="5" stroke-linecap="round"/></svg>`;
       d.appendChild(actLine);
       const top2=h("div","",{display:"flex",alignItems:"center",padding:"4px 8px 0 22px",position:"relative",zIndex:"1",gap:"3px"});
