@@ -43,7 +43,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans JP',sans
 <script>
 'use strict';
 
-const VERSION="1.2.0";
+const VERSION="1.4.0";
 
 /* ═══ CONSTANTS ═══ */
 const ACTS=[{id:1,label:"ACT 1",sub:"pp.1–25",color:"#D4A017"},{id:2,label:"ACT 2a",sub:"pp.25–55",color:"#2E8B7A"},{id:3,label:"ACT 2b",sub:"pp.55–75",color:"#B94A2C"},{id:4,label:"ACT 3",sub:"pp.75–110",color:"#6B5CA5"}];
@@ -68,6 +68,7 @@ const PALS={
   light:["#faf8f4","#f2c4c4","#f2d8b8","#f0e8b0","#d4ecc8","#b0e0d4","#c4def0","#b8bce8","#dec8f0","#c8c8c8"]
 };
 const TAG_COLS=["#e05252","#e88a3a","#d4c032","#4ab858","#30b8a0","#4a9ae0","#6a5cd4","#c252c2"];
+const TAG_SYMS=["●","■","◆","★","▲","▼","〓","♪"];
 
 let _uid=1;
 function uid(){return"c"+_uid+++"_"+Math.random().toString(36).slice(2,6)}
@@ -79,7 +80,7 @@ function mkCard(a,ry,x){return{id:uid(),type:"card",x,y:ry,actIdx:a,w:CW,h:CH,de
 function mkGroup(x,ay,c){return{id:uid(),type:"group",x,y:ay,w:GW,h:GH,color:c||"#888",name:"",tags:[]}}
 
 /* ═══ STATE ═══ */
-let S={items:[],name:"新しいプロジェクト",theme:"light",hScale:1,editCard:null,editGroup:null,saveOk:null,dirty:false,highlight:null};
+let S={items:[],name:"新しいプロジェクト",theme:"light",hScale:1,tagNames:["","","","","","","",""],editCard:null,editGroup:null,saveOk:null,dirty:false,highlight:null};
 
 function T(){return THEMES[S.theme]}
 function P(){return PALS[S.theme]}
@@ -335,9 +336,11 @@ function render(){
       const hlG=S.highlight===item.id;
       d.style.cssText=`left:${item.x}px;top:${item.y}px;width:${item.w}px;height:${item.h}px;z-index:${hlG?9999:zi+1};border:2px dashed ${item.color};border-radius:14px;background:${item.color}${th.lO}${hlG?`;outline:3px solid #e8b931;opacity:0.85`:""}`;
       const cc=grpCnt(item.id);
-      d.appendChild(h("div","",{position:"absolute",top:"-10px",left:"10px",background:item.color,color:"#fff",fontSize:"10px",fontWeight:"700",padding:"1px 8px",borderRadius:"6px"},(item.name||"グループ")+(cc>0?` (${cc}枚→1シーン)`:"")));
-      /* tag lines at bottom of group */
-      if(item.tags&&item.tags.length>0){const tbar=h("div","",{display:"flex",flexDirection:"column",position:"absolute",bottom:"0",left:"0",right:"0",borderRadius:"0 0 12px 12px",overflow:"hidden"});[...item.tags].sort((a,b)=>a-b).forEach(ti=>{tbar.appendChild(h("div","",{height:"3px",background:TAG_COLS[ti]||TAG_COLS[0]}))});d.appendChild(tbar)}
+      const glabel=h("div","",{position:"absolute",top:"-10px",left:"10px",display:"flex",alignItems:"center",gap:"4px"});
+      glabel.appendChild(h("span","",{background:item.color,color:"#fff",fontSize:"10px",fontWeight:"700",padding:"1px 8px",borderRadius:"6px"},(item.name||"グループ")+(cc>0?` (${cc}枚→1シーン)`:"")));
+      if(item.tags&&item.tags.length>0){[...item.tags].sort((a,b)=>a-b).forEach(ti=>{glabel.appendChild(h("span","",{fontSize:"10px",color:TAG_COLS[ti]||TAG_COLS[0]},TAG_SYMS[ti]||"●"))})}
+      d.appendChild(glabel);
+      /* tag lines removed — tags shown as symbols */
       d.appendChild(mkHandle(item,item.color));
       d.addEventListener("mousedown",e=>onMouseItemDown(e,item));d.addEventListener("touchstart",e=>onTouchItemDown(e,item));
       d.addEventListener("contextmenu",e=>e.preventDefault());d.addEventListener("dblclick",()=>openGroupModal(item));
@@ -353,13 +356,19 @@ function render(){
       /* background layer with opacity for ghost */
       const bgLayer=h("div","",{position:"absolute",inset:"0",background:bg,opacity:isGhost?"0.7":"1",borderRadius:"3px",pointerEvents:"none",zIndex:"0"});
       d.appendChild(bgLayer);
-      /* tag lines at top */
-      if(card.tags&&card.tags.length>0){const tbar=h("div","",{display:"flex",flexDirection:"column",position:"absolute",top:"0",left:"0",right:"0",zIndex:"1"});[...card.tags].sort((a,b)=>a-b).forEach(ti=>{tbar.appendChild(h("div","",{height:"3px",background:TAG_COLS[ti]||TAG_COLS[0]}))});d.appendChild(tbar)}
-      const top2=h("div","",{display:"flex",justifyContent:"space-between",alignItems:"center",padding:"5px 8px 0",position:"relative",zIndex:"1"});
-      top2.appendChild(h("div","",{width:"7px",height:"7px",borderRadius:"4px",background:act.color,flexShrink:"0"}));
-      if(inG)top2.appendChild(h("span","",{fontSize:"9px",color:gc,fontWeight:"700"},"GRP"));
+      /* tag lines removed — tags shown as symbols */
+      /* ACT indicator: diagonal line at top-left corner, overflows card (clipped by overflow:hidden) */
+      const actLine=document.createElement("div");
+      actLine.style.cssText=`position:absolute;top:-4px;left:-11px;z-index:2;pointer-events:none`;
+      actLine.innerHTML=`<svg width="32" height="32" viewBox="0 0 32 32"><line x1="2" y1="30" x2="30" y2="2" stroke="${act.color}" stroke-width="5" stroke-linecap="round"/></svg>`;
+      d.appendChild(actLine);
+      const top2=h("div","",{display:"flex",alignItems:"center",padding:"4px 8px 0 22px",position:"relative",zIndex:"1",gap:"3px"});
+      if(card.tags&&card.tags.length>0){const tw=pl[0];[...card.tags].sort((a,b)=>a-b).forEach(ti=>{top2.appendChild(h("span","",{fontSize:"11px",color:TAG_COLS[ti]||TAG_COLS[0],lineHeight:"1",textShadow:`-1px -1px 0 ${tw},1px -1px 0 ${tw},-1px 1px 0 ${tw},1px 1px 0 ${tw}`},TAG_SYMS[ti]||"●"))})}
+      const topRight=h("div","",{marginLeft:"auto",display:"flex",gap:"4px",alignItems:"center"});
+      if(inG)topRight.appendChild(h("span","",{fontSize:"9px",color:gc,fontWeight:"700"},"GRP"));
+      top2.appendChild(topRight);
       d.appendChild(top2);
-      d.appendChild(h("div","",{flex:"1",padding:"4px 10px 0",fontSize:"12px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1",whiteSpace:"pre-wrap"},empty?"タップで編集":card.description));
+      d.appendChild(h("div","",{flex:"1",padding:"4px 10px 0",fontSize:"12px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1",whiteSpace:"pre-wrap",textShadow:`-1px -1px 0 ${bg},1px -1px 0 ${bg},-1px 1px 0 ${bg},1px 1px 0 ${bg}`},empty?"タップで編集":card.description));
       if(!empty){const bot=h("div","",{padding:"0 10px 6px",marginTop:"auto",position:"relative",zIndex:"1"});
         if(!isGhost||card.emotion)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},"+/- "+(card.emotion||"")));
         if(!isGhost||card.conflict)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},">< "+(card.conflict||"")));
@@ -410,14 +419,17 @@ function showInfo(){
     "・タブレット: タップ×2 → 編集 / 長押し→ドラッグ → 移動",
     "・右下の⟋をドラッグ → サイズ変更",
     "・編集画面の🗑ボタン → 削除",
+    "・編集画面で Shift+Enter → 保存",
     "",
     "【グループ】",
     "・点線の枠。カードをグループ内に入れると結合",
     "・グループ内のカードは何枚でも1シーン",
     "・グループ移動で中のカードも移動",
+    "・編集画面で Shift+Enter → 保存",
     "",
     "【ヘッダー】",
     "・↩↪ または Ctrl+Z/Y → 元に戻す/やり直し",
+    "・−/＋ → 横幅の拡縮",
     "・📄新規 → 新しいボードを作成",
     "・💾保存 / Ctrl+S → 上書き保存（PC）",
     "・別名保存 / Ctrl+Shift+S → 名前を付けて保存",
@@ -435,12 +447,19 @@ function showInfo(){
 
 /* ═══ CARD MODAL ═══ */
 function mkTagPicker(tags,th){
-  const wrap=h("div","",{display:"flex",gap:"6px",marginBottom:"16px",flexWrap:"wrap"});
+  const wrap=h("div","",{display:"flex",flexDirection:"column",gap:"4px",marginBottom:"16px"});
   TAG_COLS.forEach((tc,idx)=>{
     const sel=tags.includes(idx);
-    const dot=h("div","",{width:"28px",height:"28px",borderRadius:"6px",cursor:"pointer",background:tc,border:sel?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`,opacity:sel?"1":"0.4",transition:"opacity .15s"});
-    dot.onclick=()=>{const i=tags.indexOf(idx);if(i>=0)tags.splice(i,1);else tags.push(idx);wrap.querySelectorAll("div").forEach((d,di)=>{const s=tags.includes(di);d.style.border=s?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`;d.style.opacity=s?"1":"0.4"})};
-    wrap.appendChild(dot);
+    const row=h("div","",{display:"flex",alignItems:"center",gap:"8px"});
+    const dot=h("div","",{width:"18px",height:"18px",minWidth:"18px",borderRadius:"4px",cursor:"pointer",background:tc,border:sel?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`,opacity:sel?"1":"0.4",transition:"opacity .15s",display:"flex",alignItems:"center",justifyContent:"center",fontSize:"10px",color:"#fff",lineHeight:"1"},TAG_SYMS[idx]);
+    dot.onclick=()=>{const i=tags.indexOf(idx);if(i>=0)tags.splice(i,1);else tags.push(idx);wrap.querySelectorAll("[data-tag-dot]").forEach((d,di)=>{const s=tags.includes(di);d.style.border=s?`3px solid ${th.tx}`:`3px solid ${th.cBrd}`;d.style.opacity=s?"1":"0.4"})};
+    dot.setAttribute("data-tag-dot","");
+    row.appendChild(dot);
+    const inp=document.createElement("input");inp.type="text";inp.value=S.tagNames[idx]||"";inp.placeholder="タグ名";
+    inp.style.cssText=`flex:1;background:${th.iBg};border:1px solid ${th.iBrd};color:${th.tx};border-radius:6px;padding:4px 8px;font-size:12px;outline:none`;
+    inp.oninput=e=>{S.tagNames[idx]=e.target.value};
+    row.appendChild(inp);
+    wrap.appendChild(row);
   });
   return wrap;
 }
@@ -534,15 +553,15 @@ function migrateItems(items){
   });
   return items;
 }
-function autoSave(){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,hScale:S.hScale}))}catch{}}
-function autoRestore(){try{const raw=localStorage.getItem(AUTOSAVE_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.items){S.items=migrateItems(d.items);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.hScale)S.hScale=d.hScale}}catch{}}
+function autoSave(){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,hScale:S.hScale,tagNames:S.tagNames}))}catch{}}
+function autoRestore(){try{const raw=localStorage.getItem(AUTOSAVE_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.items){S.items=migrateItems(d.items);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.hScale)S.hScale=d.hScale;if(d.tagNames)S.tagNames=d.tagNames}}catch{}}
 
 /* ═══ SAVE / LOAD / NEW ═══ */
 let fileHandle=null; // File System Access API handle for overwrite
 const hasFS=!!window.showSaveFilePicker; // PC Chrome/Brave/Edge
 
 function saveJSON(){
-  return JSON.stringify({projectName:S.name,items:S.items,theme:S.theme},null,2);
+  return JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,tagNames:S.tagNames},null,2);
 }
 function safeName(){return(S.name||"board").replace(/[^\w\u3000-\u9FFF-]/g,"_")||"board"}
 
@@ -591,7 +610,7 @@ async function doLoad(){
       const d=JSON.parse(txt);
       pushUndo();
       if(d.items)S.items=migrateItems(d.items);else if(d.cards)S.items=migrateItems(d.cards);
-      if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;
+      if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.tagNames)S.tagNames=d.tagNames;
       fileHandle=fh; // remember handle for overwrite
       S.dirty=false;render();return;
     }catch(e){if(e.name==="AbortError")return}
@@ -600,7 +619,7 @@ async function doLoad(){
   const inp=document.createElement("input");inp.type="file";inp.accept=".json";inp.style.cssText="position:fixed;left:-9999px";
   document.body.appendChild(inp);
   inp.onchange=e=>{const f=e.target.files?.[0];if(!f)return dn();
-    const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);pushUndo();if(d.items)S.items=migrateItems(d.items);else if(d.cards)S.items=migrateItems(d.cards);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;S.dirty=false;fileHandle=null}catch{alert("読み込み失敗")}dn();render()};
+    const r=new FileReader();r.onload=ev=>{try{const d=JSON.parse(ev.target.result);pushUndo();if(d.items)S.items=migrateItems(d.items);else if(d.cards)S.items=migrateItems(d.cards);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.tagNames)S.tagNames=d.tagNames;S.dirty=false;fileHandle=null}catch{alert("読み込み失敗")}dn();render()};
     r.onerror=()=>{alert("読み込み失敗");dn()};r.readAsText(f)};
   function dn(){try{document.body.removeChild(inp)}catch{}}
   setTimeout(()=>inp.click(),0);
@@ -609,7 +628,7 @@ async function doLoad(){
 function doNew(){
   if(S.dirty&&S.items.length>0){if(!confirm("現在のボードは保存されていません。新しいボードを作成しますか？"))return}
   pushUndo();
-  S.items=[];S.name="新しいプロジェクト";S.dirty=false;fileHandle=null;
+  S.items=[];S.name="新しいプロジェクト";S.tagNames=["","","","","","","",""];S.dirty=false;fileHandle=null;
   undoStack=[];redoStack=[];
   render();
 }
