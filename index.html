@@ -360,7 +360,7 @@ function render(){
       /* ACT indicator: diagonal line at top-left corner, overflows card (clipped by overflow:hidden) */
       const actLine=document.createElement("div");
       actLine.style.cssText=`position:absolute;top:-8px;left:-14px;z-index:2;pointer-events:none`;
-      actLine.innerHTML=`<svg width="32" height="32" viewBox="0 0 32 32"><line x1="2" y1="30" x2="30" y2="2" stroke="${act.color}" stroke-width="5" stroke-linecap="round"/></svg>`;
+      actLine.innerHTML=`<svg width="32" height="32" viewBox="0 0 32 32"><line x1="2" y1="30" x2="30" y2="2" stroke="${act.color}" stroke-width="3.5" stroke-linecap="round"/></svg>`;
       d.appendChild(actLine);
       const top2=h("div","",{display:"flex",alignItems:"center",padding:"4px 8px 0 22px",position:"relative",zIndex:"1",gap:"3px"});
       if(card.tags&&card.tags.length>0){const tw=pl[0];[...card.tags].sort((a,b)=>a-b).forEach(ti=>{top2.appendChild(h("span","",{fontSize:"11px",color:TAG_COLS[ti]||TAG_COLS[0],lineHeight:"1",textShadow:`-1px -1px 0 ${tw},1px -1px 0 ${tw},-1px 1px 0 ${tw},1px 1px 0 ${tw}`},TAG_SYMS[ti]||"●"))})}
