@@ -478,7 +478,9 @@ function cardModal(){
   const rb=h("div","",{display:"flex",gap:"10px"});
   const cb=h("button","btn",{background:th.iBrd,color:th.tx},"キャンセル");cb.onclick=()=>{closeModal();render()};
   const sb=h("button","btn",{background:th.aBg,color:th.aFg},"保存");
-  sb.onclick=()=>{pushUndo();Object.assign(card,{description:desc,emotion:emo,conflict:conf,colorIdx:col,tags,ghost});closeModal();render()};
+  const doSaveCard=()=>{pushUndo();Object.assign(card,{description:desc,emotion:emo,conflict:conf,colorIdx:col,tags,ghost});closeModal();render()};
+  sb.onclick=doSaveCard;
+  box.addEventListener("keydown",e=>{if(e.shiftKey&&e.key==="Enter"){e.preventDefault();doSaveCard()}});
   rb.appendChild(cb);rb.appendChild(sb);btns.appendChild(rb);box.appendChild(btns);ov.appendChild(box);return ov;
 }
 
@@ -505,7 +507,10 @@ function groupModal(){
   del.onclick=()=>{if(confirm("このグループを削除しますか？")){pushUndo();S.items.forEach(i=>{if(i.type==="card"&&i.groupId===group.id)i.groupId=null});S.items=S.items.filter(i=>i.id!==group.id);closeModal();render()}};btns.appendChild(del);
   const rb=h("div","",{display:"flex",gap:"10px"});
   const cb=h("button","btn",{background:th.iBrd,color:th.tx},"キャンセル");cb.onclick=()=>{closeModal();render()};
-  const ob=h("button","btn",{background:th.aBg,color:th.aFg},"OK");ob.onclick=()=>{pushUndo();group.color=col;group.name=gname;group.tags=tags;closeModal();render()};
+  const ob=h("button","btn",{background:th.aBg,color:th.aFg},"OK");
+  const doSaveGroup=()=>{pushUndo();group.color=col;group.name=gname;group.tags=tags;closeModal();render()};
+  ob.onclick=doSaveGroup;
+  box.addEventListener("keydown",e=>{if(e.shiftKey&&e.key==="Enter"){e.preventDefault();doSaveGroup()}});
   rb.appendChild(cb);rb.appendChild(ob);btns.appendChild(rb);box.appendChild(btns);ov.appendChild(box);return ov;
 }
 
