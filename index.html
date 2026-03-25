@@ -333,7 +333,7 @@ function render(){
     const d=document.createElement("div");d.className="item "+(item.type==="card"?"card":"group");domMap.set(item.id,d);
     if(item.type==="group"){
       const hlG=S.highlight===item.id;
-      d.style.cssText=`left:${item.x}px;top:${item.y}px;width:${item.w}px;height:${item.h}px;z-index:${zi+1};border:2px dashed ${item.color};border-radius:14px;background:${item.color}${th.lO}${hlG?`;outline:3px solid ${th.aBg};outline-offset:2px`:""}`;
+      d.style.cssText=`left:${item.x}px;top:${item.y}px;width:${item.w}px;height:${item.h}px;z-index:${hlG?9999:zi+1};border:2px dashed ${item.color};border-radius:14px;background:${item.color}${th.lO}${hlG?`;outline:3px solid #e8b931;opacity:0.85`:""}`;
       const cc=grpCnt(item.id);
       d.appendChild(h("div","",{position:"absolute",top:"-10px",left:"10px",background:item.color,color:"#fff",fontSize:"10px",fontWeight:"700",padding:"1px 8px",borderRadius:"6px"},(item.name||"グループ")+(cc>0?` (${cc}枚→1シーン)`:"")));
       /* tag lines at bottom of group */
@@ -349,7 +349,7 @@ function render(){
       const hlC=S.highlight===card.id;
       const borderStyle=isGhost?"2.5px dashed":(inG?"2.5px solid":"1.5px solid");
       const borderColor=inG?gc:th.bCol;
-      d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${zi+1};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`};position:absolute${hlC?`;outline:3px solid ${th.aBg};outline-offset:2px`:""}`;
+      d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${hlC?9999:zi+1};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`};position:absolute${hlC?`;outline:3px solid #e8b931;opacity:0.85`:""}`;
       /* background layer with opacity for ghost */
       const bgLayer=h("div","",{position:"absolute",inset:"0",background:bg,opacity:isGhost?"0.7":"1",borderRadius:"3px",pointerEvents:"none",zIndex:"0"});
       d.appendChild(bgLayer);
@@ -359,7 +359,7 @@ function render(){
       top2.appendChild(h("div","",{width:"7px",height:"7px",borderRadius:"4px",background:act.color,flexShrink:"0"}));
       if(inG)top2.appendChild(h("span","",{fontSize:"9px",color:gc,fontWeight:"700"},"GRP"));
       d.appendChild(top2);
-      d.appendChild(h("div","",{flex:"1",padding:"4px 10px 0",fontSize:"12px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1"},empty?"タップで編集":card.description));
+      d.appendChild(h("div","",{flex:"1",padding:"4px 10px 0",fontSize:"12px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1",whiteSpace:"pre-wrap"},empty?"タップで編集":card.description));
       if(!empty){const bot=h("div","",{padding:"0 10px 6px",marginTop:"auto",position:"relative",zIndex:"1"});
         if(!isGhost||card.emotion)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},"+/- "+(card.emotion||"")));
         if(!isGhost||card.conflict)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},">< "+(card.conflict||"")));
