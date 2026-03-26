@@ -43,13 +43,14 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans JP',sans
 <script>
 'use strict';
 
-const VERSION="1.4.0";
+const VERSION="1.5.0";
 
 /* ═══ CONSTANTS ═══ */
 const ACTS=[{id:1,label:"ACT 1",sub:"pp.1–25",color:"#D4A017"},{id:2,label:"ACT 2a",sub:"pp.25–55",color:"#2E8B7A"},{id:3,label:"ACT 2b",sub:"pp.55–75",color:"#B94A2C"},{id:4,label:"ACT 3",sub:"pp.75–110",color:"#6B5CA5"}];
 const CW=160,CH=120,COLS=10,GW=200,GH=160;
 const HEADER_H=46,LANE_PAD=20;
 const boardW=100+COLS*(CW+8)+100;
+const BASE_FONT=12;
 
 function layout(){
   const vh=window.innerHeight-HEADER_H;
@@ -80,10 +81,11 @@ function mkCard(a,ry,x){return{id:uid(),type:"card",x,y:ry,actIdx:a,w:CW,h:CH,de
 function mkGroup(x,ay,c){return{id:uid(),type:"group",x,y:ay,w:GW,h:GH,color:c||"#888",name:"",tags:[]}}
 
 /* ═══ STATE ═══ */
-let S={items:[],name:"新しいプロジェクト",theme:"light",hScale:1,tagNames:["","","","","","","",""],editCard:null,editGroup:null,saveOk:null,dirty:false,highlight:null};
+let S={items:[],name:"新しいプロジェクト",theme:"light",fontPt:0,tagNames:["","","","","","","",""],editCard:null,editGroup:null,saveOk:null,dirty:false,highlight:null};
 
 function T(){return THEMES[S.theme]}
 function P(){return PALS[S.theme]}
+function fs(){return BASE_FONT+S.fontPt}
 function crds(){return S.items.filter(i=>i.type==="card")}
 function grps(){return S.items.filter(i=>i.type==="group")}
 function grpOf(c){const ax=c.x+c.w/2,ay=cardAbsY(c)+c.h/2;return grps().find(g=>inside(ax,ay,g.x,g.y,g.w,g.h))||null}
@@ -169,7 +171,7 @@ function onMove(ev){
   if(rsz){
     ev.preventDefault();const{cx,cy}=gp(ev);
     const it=S.items.find(i=>i.id===rsz.id);if(!it)return;
-    it.w=Math.max(100,rsz.ow+(cx-rsz.sx)/S.hScale);it.h=Math.max(70,rsz.oh+(cy-rsz.sy));
+    it.w=Math.max(100,rsz.ow+(cx-rsz.sx));it.h=Math.max(35,rsz.oh+(cy-rsz.sy));
     const el=domMap.get(it.id);if(el){el.style.width=it.w+"px";el.style.height=it.h+"px"}
     return;
   }
@@ -181,8 +183,7 @@ function onMove(ev){
   if(!drag)return;
   ev.preventDefault();
   const{cx,cy}=gp(ev);
-  const dx=(cx-drag.sx)/S.hScale,dy=(cy-drag.sy);
-  // for mouse: require minimum movement before actually moving
+  const dx=(cx-drag.sx),dy=(cy-drag.sy);
   if(!drag.moved){if(Math.abs(dx)<MOUSE_THR&&Math.abs(dy)<MOUSE_THR)return;drag.moved=true}
   const it=S.items.find(i=>i.id===drag.id);if(!it)return;
   const nx=drag.ox+dx,ny=drag.oy+dy;
@@ -200,7 +201,6 @@ function onMove(ev){
 }
 
 function onEnd(ev){
-  // touch long-press hold release → double-tap check
   if(hold){clearTimeout(hold.timer);const hid=hold.id;hold=null;
     const it=S.items.find(i=>i.id===hid);
     if(it&&checkDblTap(it)){it.type==="card"?openCardModal(it):openGroupModal(it)}
@@ -211,7 +211,6 @@ function onEnd(ev){
   const d=drag;drag=null;
   const el=domMap.get(d.id);if(el){el.style.outline="";el.style.opacity=""}
   const it=S.items.find(i=>i.id===d.id);
-  // mouse: if didn't move, this was a click → open modal
   if(!d.moved){
     if(it){
       const isTouch=ev&&ev.type&&ev.type.startsWith("touch");
@@ -232,9 +231,7 @@ window.addEventListener("touchend",onEnd);
 window.addEventListener("resize",()=>render());
 window.addEventListener("keydown",e=>{
   const mod=e.ctrlKey||e.metaKey;
-  // allow Ctrl+Z/Y even in inputs? No — skip if in input
   if(e.target.tagName==="INPUT"||e.target.tagName==="TEXTAREA"){
-    // but still handle Ctrl+S in inputs (save shouldn't be blocked)
     if(mod&&e.key==="s"){e.preventDefault();if(e.shiftKey)doSaveAs();else doSave()}
     return;
   }
@@ -249,7 +246,7 @@ function startResize(ev,item){ev.preventDefault();ev.stopPropagation();S.highlig
 function h(tag,cls,style,txt){const e=document.createElement(tag);if(cls)e.className=cls;if(style)Object.assign(e.style,style);if(txt!=null)e.textContent=txt;return e}
 
 function render(){
-  const th=T(),pl=P(),L=layout();
+  const th=T(),pl=P(),L=layout(),f=fs();
   document.body.style.background=th.bg;
   document.querySelector('meta[name="theme-color"]').content=th.aBg;
 
@@ -264,7 +261,6 @@ function render(){
   left.appendChild(title);
   left.appendChild(h("span","",{fontSize:"11px",color:th.txS,background:th.bBg,padding:"2px 8px",borderRadius:"12px"},scenes()+" シーン"));
 
-  // info button
   const infoBtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"13px",padding:"3px 8px",borderRadius:"50%",width:"26px",height:"26px"},"ⓘ");
   infoBtn.onclick=()=>showInfo();
   left.appendChild(infoBtn);
@@ -272,7 +268,6 @@ function render(){
 
   const right=h("div","",{display:"flex",gap:"5px",alignItems:"center",flexWrap:"wrap"});
 
-  // undo/redo
   const ubtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:undoStack.length?th.txS:th.txM,fontSize:"15px",padding:"3px 8px"},"↩");
   ubtn.onclick=doUndo;ubtn.title="元に戻す";right.appendChild(ubtn);
   const rbtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:redoStack.length?th.txS:th.txM,fontSize:"15px",padding:"3px 8px"},"↪");
@@ -280,24 +275,21 @@ function render(){
 
   right.appendChild(h("div","",{width:"1px",height:"18px",background:th.hBrd}));
 
-  // theme
   const thBtn=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"14px",padding:"3px 8px"},S.theme==="dark"?"☀️":"🌙");
   thBtn.onclick=()=>{S.theme=S.theme==="dark"?"light":"dark";render()};right.appendChild(thBtn);
 
-  // horizontal scale
-  const hsMinus=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:S.hScale>0.5?th.txS:th.txM,fontSize:"13px",padding:"3px 7px",fontWeight:"700"},"−");
-  hsMinus.onclick=()=>{if(S.hScale>0.5){S.hScale=Math.round((S.hScale-0.1)*10)/10;render()}};right.appendChild(hsMinus);
-  right.appendChild(h("span","",{fontSize:"10px",color:th.txS,minWidth:"28px",textAlign:"center"},Math.round(S.hScale*100)+"%"));
-  const hsPlus=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:S.hScale<2?th.txS:th.txM,fontSize:"13px",padding:"3px 7px",fontWeight:"700"},"＋");
-  hsPlus.onclick=()=>{if(S.hScale<2){S.hScale=Math.round((S.hScale+0.1)*10)/10;render()}};right.appendChild(hsPlus);
+  // font size control
+  const fsMinus=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:S.fontPt>-4?th.txS:th.txM,fontSize:"13px",padding:"3px 7px",fontWeight:"700"},"A−");
+  fsMinus.onclick=()=>{if(S.fontPt>-4){S.fontPt--;render()}};right.appendChild(fsMinus);
+  right.appendChild(h("span","",{fontSize:"10px",color:th.txS,minWidth:"28px",textAlign:"center"},f+"pt"));
+  const fsPlus=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:S.fontPt<8?th.txS:th.txM,fontSize:"13px",padding:"3px 7px",fontWeight:"700"},"A＋");
+  fsPlus.onclick=()=>{if(S.fontPt<8){S.fontPt++;render()}};right.appendChild(fsPlus);
 
   right.appendChild(h("div","",{width:"1px",height:"18px",background:th.hBrd}));
 
-  // new board
   const nb=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS,fontSize:"12px"},"📄新規");
   nb.onclick=doNew;right.appendChild(nb);
 
-  // save (overwrite) / save-as / load
   const sv=h("button","hbtn",{border:`1px solid ${th.hBrd}`,background:th.bBg,color:th.txS},(S.saveOk==="ok"?"✅":"💾")+(fileHandle?" 上書保存":" 保存"));
   sv.onclick=doSave;sv.title="上書き保存 (Ctrl+S)";right.appendChild(sv);
   if(hasFS){
@@ -310,14 +302,8 @@ function render(){
 
   /* BOARD */
   const board=document.getElementById("board");board.innerHTML="";
-  const scaledW=Math.ceil(boardW*S.hScale);
-  board.style.cssText=`width:${boardW}px;height:${L.boardH}px;transform:scaleX(${S.hScale});transform-origin:top left`;
+  board.style.cssText=`width:${boardW}px;height:${L.boardH}px;min-width:${boardW}px`;
   domMap.clear();
-  /* ensure scrollArea has correct horizontal scroll range */
-  const sa2=document.getElementById("scrollArea");
-  let spacer=document.getElementById("hScaleSpacer");
-  if(!spacer){spacer=document.createElement("div");spacer.id="hScaleSpacer";spacer.style.cssText="position:absolute;top:0;left:0;height:1px;pointer-events:none";sa2.appendChild(spacer)}
-  spacer.style.width=scaledW+"px";
 
   ACTS.forEach((act,i)=>{
     const ly=laneY(i);
@@ -340,7 +326,6 @@ function render(){
       glabel.appendChild(h("span","",{background:item.color,color:"#fff",fontSize:"10px",fontWeight:"700",padding:"1px 8px",borderRadius:"6px"},(item.name||"グループ")+(cc>0?` (${cc}枚→1シーン)`:"")));
       if(item.tags&&item.tags.length>0){[...item.tags].sort((a,b)=>a-b).forEach(ti=>{glabel.appendChild(h("span","",{fontSize:"10px",color:TAG_COLS[ti]||TAG_COLS[0]},TAG_SYMS[ti]||"●"))})}
       d.appendChild(glabel);
-      /* tag lines removed — tags shown as symbols */
       d.appendChild(mkHandle(item,item.color));
       d.addEventListener("mousedown",e=>onMouseItemDown(e,item));d.addEventListener("touchstart",e=>onTouchItemDown(e,item));
       d.addEventListener("contextmenu",e=>e.preventDefault());d.addEventListener("dblclick",()=>openGroupModal(item));
@@ -353,25 +338,23 @@ function render(){
       const borderStyle=isGhost?"2.5px dashed":(inG?"2.5px solid":"1.5px solid");
       const borderColor=inG?gc:th.bCol;
       d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${hlC?9999:zi+1};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`};position:absolute${hlC?`;outline:3px solid #e8b931;opacity:0.85`:""}`;
-      /* background layer with opacity for ghost */
       const bgLayer=h("div","",{position:"absolute",inset:"0",background:bg,opacity:isGhost?"0.7":"1",borderRadius:"3px",pointerEvents:"none",zIndex:"0"});
       d.appendChild(bgLayer);
-      /* tag lines removed — tags shown as symbols */
-      /* ACT indicator: diagonal line at top-left corner, overflows card (clipped by overflow:hidden) */
+      /* ACT indicator */
       const actLine=document.createElement("div");
       actLine.style.cssText=`position:absolute;top:-8px;left:-14px;z-index:2;pointer-events:none`;
       actLine.innerHTML=`<svg width="32" height="32" viewBox="0 0 32 32"><line x1="2" y1="30" x2="30" y2="2" stroke="${act.color}" stroke-width="3.5" stroke-linecap="round"/></svg>`;
       d.appendChild(actLine);
       const top2=h("div","",{display:"flex",alignItems:"center",padding:"4px 8px 0 22px",position:"relative",zIndex:"1",gap:"3px"});
-      if(card.tags&&card.tags.length>0){const tw=pl[0];[...card.tags].sort((a,b)=>a-b).forEach(ti=>{top2.appendChild(h("span","",{fontSize:"11px",color:TAG_COLS[ti]||TAG_COLS[0],lineHeight:"1",textShadow:`-1px -1px 0 ${tw},1px -1px 0 ${tw},-1px 1px 0 ${tw},1px 1px 0 ${tw}`},TAG_SYMS[ti]||"●"))})}
+      if(card.tags&&card.tags.length>0){const tw=pl[0];[...card.tags].sort((a,b)=>a-b).forEach(ti=>{top2.appendChild(h("span","",{fontSize:(f-1)+"px",color:TAG_COLS[ti]||TAG_COLS[0],lineHeight:"1",textShadow:`-1px -1px 0 ${tw},1px -1px 0 ${tw},-1px 1px 0 ${tw},1px 1px 0 ${tw}`},TAG_SYMS[ti]||"●"))})}
       const topRight=h("div","",{marginLeft:"auto",display:"flex",gap:"4px",alignItems:"center"});
-      if(inG)topRight.appendChild(h("span","",{fontSize:"9px",color:gc,fontWeight:"700"},"GRP"));
+      if(inG)topRight.appendChild(h("span","",{fontSize:(f-3)+"px",color:gc,fontWeight:"700"},"GRP"));
       top2.appendChild(topRight);
       d.appendChild(top2);
-      d.appendChild(h("div","",{flex:"1",padding:"4px 10px 0",fontSize:"12px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1",whiteSpace:"pre-wrap",textShadow:`-1px -1px 0 ${bg},1px -1px 0 ${bg},-1px 1px 0 ${bg},1px 1px 0 ${bg}`},empty?"タップで編集":card.description));
-      if(!empty){const bot=h("div","",{padding:"0 10px 6px",marginTop:"auto",position:"relative",zIndex:"1"});
-        if(!isGhost||card.emotion)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},"+/- "+(card.emotion||"")));
-        if(!isGhost||card.conflict)bot.appendChild(h("div","",{fontSize:"11px",color:th.cT,opacity:".7",lineHeight:"1.6"},">< "+(card.conflict||"")));
+      d.appendChild(h("div","",{flex:"1",flexShrink:"0",padding:"4px 10px 0",fontSize:f+"px",lineHeight:"1.5",fontWeight:"500",color:empty?th.cET:th.cT,wordBreak:"break-word",overflow:"hidden",position:"relative",zIndex:"1",whiteSpace:"pre-wrap",textShadow:`-1px -1px 0 ${bg},1px -1px 0 ${bg},-1px 1px 0 ${bg},1px 1px 0 ${bg}`},empty?"タップで編集":card.description));
+      if(!empty){const bot=h("div","",{padding:"0 10px 6px",flexShrink:"999",overflow:"hidden",minHeight:"0",position:"relative",zIndex:"1"});
+        if(!isGhost||card.emotion)bot.appendChild(h("div","",{fontSize:(f-1)+"px",color:th.cT,opacity:".7",lineHeight:"1.6"},"+/- "+(card.emotion||"")));
+        if(!isGhost||card.conflict)bot.appendChild(h("div","",{fontSize:(f-1)+"px",color:th.cT,opacity:".7",lineHeight:"1.6"},">< "+(card.conflict||"")));
         if(bot.childNodes.length)d.appendChild(bot)}
       d.appendChild(mkHandle(card,th.hdl));
       d.addEventListener("mousedown",e=>onMouseItemDown(e,card));d.addEventListener("touchstart",e=>onTouchItemDown(e,card));
@@ -385,10 +368,10 @@ function render(){
   /* FABs */
   const fabs=document.getElementById("fabs");fabs.innerHTML="";
   const gBtn=h("button","",{width:"44px",height:"44px",borderRadius:"50%",background:"transparent",border:`2px dashed ${th.gBrd}`,cursor:"pointer",fontSize:"18px",color:th.txS,fontWeight:"700"},"⊞");
-  gBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const vw=sa.clientWidth,vh=sa.clientHeight;const x=((sa.scrollLeft||0)+vw-GW*S.hScale-100)/S.hScale+Math.random()*80-40;const y=(sa.scrollTop||0)+vh-GH-80+Math.random()*60-30;const g=mkGroup(x,y,th.gBrd);S.items.push(g);S.highlight=g.id;render()};
+  gBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const vw=sa.clientWidth,vh=sa.clientHeight;const x=(sa.scrollLeft||0)+vw-GW-100+Math.random()*80-40;const y=(sa.scrollTop||0)+vh-GH-80+Math.random()*60-30;const g=mkGroup(x,y,th.gBrd);S.items.push(g);S.highlight=g.id;render()};
   fabs.appendChild(gBtn);
   const cBtn=h("button","",{width:"52px",height:"52px",borderRadius:"50%",background:th.aBg,border:"none",cursor:"pointer",fontSize:"24px",color:th.aFg,fontWeight:"900",boxShadow:`0 4px 20px ${th.aBg}66`},"＋");
-  cBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const vw=sa.clientWidth,vh=sa.clientHeight;const x=((sa.scrollLeft||0)+vw-CW*S.hScale-100)/S.hScale+Math.random()*80-40;const ay=(sa.scrollTop||0)+vh-CH-80+Math.random()*60-30;const{actIdx,relY}=cardFromAbs(ay);const c=mkCard(actIdx,relY,x);c.description="新しいシーン";S.items.push(c);S.highlight=c.id;render()};
+  cBtn.onclick=()=>{pushUndo();const sa=document.getElementById("scrollArea");const vw=sa.clientWidth,vh=sa.clientHeight;const x=(sa.scrollLeft||0)+vw-CW-100+Math.random()*80-40;const ay=(sa.scrollTop||0)+vh-CH-80+Math.random()*60-30;const{actIdx,relY}=cardFromAbs(ay);const c=mkCard(actIdx,relY,x);c.description="新しいシーン";S.items.push(c);S.highlight=c.id;render()};
   fabs.appendChild(cBtn);
 
   autoSave();
@@ -429,7 +412,7 @@ function showInfo(){
     "",
     "【ヘッダー】",
     "・↩↪ または Ctrl+Z/Y → 元に戻す/やり直し",
-    "・−/＋ → 横幅の拡縮",
+    "・A−/A＋ → カード文字サイズ変更",
     "・📄新規 → 新しいボードを作成",
     "・💾保存 / Ctrl+S → 上書き保存（PC）",
     "・別名保存 / Ctrl+Shift+S → 名前を付けて保存",
@@ -486,7 +469,6 @@ function cardModal(){
   pl.forEach((pc,idx)=>{const dot=h("div","pdot",{background:pc,border:col===idx?`2px solid ${th.tx}`:`2px solid ${th.cBrd}`});dot.onclick=()=>{col=idx;pd.querySelectorAll(".pdot").forEach(d=>d.style.border=`2px solid ${th.cBrd}`);dot.style.border=`2px solid ${th.tx}`};pd.appendChild(dot)});box.appendChild(pd);
   box.appendChild(h("label","",{color:th.txS},"タグ"));
   box.appendChild(mkTagPicker(tags,th));
-  /* ghost checkbox */
   const ghostRow=document.createElement("label");ghostRow.style.cssText="display:flex;align-items:center;gap:8px;margin-bottom:16px;cursor:pointer";
   const gc=document.createElement("input");gc.type="checkbox";gc.checked=ghost;gc.style.cssText="width:18px;height:18px;cursor:pointer;accent-color:#888";gc.onchange=e=>ghost=e.target.checked;
   ghostRow.appendChild(gc);ghostRow.appendChild(h("span","",{fontSize:"13px",color:th.txS},"ゴースト（点線枠・シーンカウント除外）"));
@@ -535,7 +517,6 @@ function groupModal(){
 
 /* ═══ AUTOSAVE ═══ */
 const AUTOSAVE_KEY="stc_board_autosave";
-/* migrate old hex color to colorIdx */
 function migrateItems(items){
   const oldHex=["#a8c4d8","#a8d5ba","#d4b896","#c4a8d4","#d4a8a8","#8ecdc2","#dcc87a","#d9a88a","#9abac4","#b8b8b8",
     "#1a1a2e","#16213e","#0f3460","#533483","#e94560","#1b998b","#e8b931","#c75b39","#2d4059","#444444",
@@ -553,19 +534,18 @@ function migrateItems(items){
   });
   return items;
 }
-function autoSave(){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,hScale:S.hScale,tagNames:S.tagNames}))}catch{}}
-function autoRestore(){try{const raw=localStorage.getItem(AUTOSAVE_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.items){S.items=migrateItems(d.items);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.hScale)S.hScale=d.hScale;if(d.tagNames)S.tagNames=d.tagNames}}catch{}}
+function autoSave(){try{localStorage.setItem(AUTOSAVE_KEY,JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,fontPt:S.fontPt,tagNames:S.tagNames}))}catch{}}
+function autoRestore(){try{const raw=localStorage.getItem(AUTOSAVE_KEY);if(!raw)return;const d=JSON.parse(raw);if(d.items){S.items=migrateItems(d.items);if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.fontPt!=null)S.fontPt=d.fontPt;if(d.tagNames)S.tagNames=d.tagNames}}catch{}}
 
 /* ═══ SAVE / LOAD / NEW ═══ */
-let fileHandle=null; // File System Access API handle for overwrite
-const hasFS=!!window.showSaveFilePicker; // PC Chrome/Brave/Edge
+let fileHandle=null;
+const hasFS=!!window.showSaveFilePicker;
 
 function saveJSON(){
   return JSON.stringify({projectName:S.name,items:S.items,theme:S.theme,tagNames:S.tagNames},null,2);
 }
 function safeName(){return(S.name||"board").replace(/[^\w\u3000-\u9FFF-]/g,"_")||"board"}
 
-/* overwrite save (Ctrl+S) — uses existing file handle or falls back to save-as */
 async function doSave(){
   const j=saveJSON();
   if(hasFS&&fileHandle){
@@ -576,11 +556,9 @@ async function doSave(){
       return;
     }catch{}
   }
-  // no handle yet or API unavailable → save-as
   doSaveAs();
 }
 
-/* save-as (Ctrl+Shift+S) — always prompts for location */
 async function doSaveAs(){
   const j=saveJSON();
   if(hasFS){
@@ -592,7 +570,6 @@ async function doSaveAs(){
       return;
     }catch(e){if(e.name==="AbortError")return}
   }
-  // fallback: download link (Android, older browsers)
   try{
     const b=new Blob([j],{type:"application/json;charset=utf-8"});const u=URL.createObjectURL(b);
     const a=document.createElement("a");a.href=u;a.download=safeName()+".json";a.style.cssText="position:fixed;left:-9999px";
@@ -611,11 +588,10 @@ async function doLoad(){
       pushUndo();
       if(d.items)S.items=migrateItems(d.items);else if(d.cards)S.items=migrateItems(d.cards);
       if(d.projectName)S.name=d.projectName;if(d.theme)S.theme=d.theme;if(d.tagNames)S.tagNames=d.tagNames;
-      fileHandle=fh; // remember handle for overwrite
+      fileHandle=fh;
       S.dirty=false;render();return;
     }catch(e){if(e.name==="AbortError")return}
   }
-  // fallback
   const inp=document.createElement("input");inp.type="file";inp.accept=".json";inp.style.cssText="position:fixed;left:-9999px";
   document.body.appendChild(inp);
   inp.onchange=e=>{const f=e.target.files?.[0];if(!f)return dn();
