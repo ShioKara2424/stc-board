@@ -43,7 +43,7 @@ html,body{width:100%;height:100%;overflow:hidden;font-family:'Noto Sans JP',sans
 <script>
 'use strict';
 
-const VERSION="1.5.1";
+const VERSION="1.5.2";
 
 /* ═══ CONSTANTS ═══ */
 const ACTS=[{id:1,label:"ACT 1",sub:"pp.1–25",color:"#D4A017"},{id:2,label:"ACT 2a",sub:"pp.25–55",color:"#2E8B7A"},{id:3,label:"ACT 2b",sub:"pp.55–75",color:"#B94A2C"},{id:4,label:"ACT 3",sub:"pp.75–110",color:"#6B5CA5"}];
@@ -335,7 +335,7 @@ function render(){
       const gc=inG?gs2.find(g=>g.id===card.groupId)?.color||th.cBrd:null;
       const isGhost=!!card.ghost;
       const hlC=S.highlight===card.id;
-      const borderStyle=isGhost?"1.5px dashed":(inG?"2.5px solid":"2.5px solid");
+      const borderStyle=isGhost?"1.5px dashed":(inG?"2.5px solid":"1.5px solid");
       const borderColor=inG?gc:th.bCol;
       d.style.cssText=`left:${card.x}px;top:${ay}px;width:${card.w}px;height:${card.h}px;z-index:${hlC?9999:zi+1};border:${borderStyle} ${borderColor};box-shadow:${empty?"none":`1px 2px 6px ${th.shd}`};position:absolute${hlC?`;outline:3px solid #e8b931;opacity:0.85`:""}`;
       const bgLayer=h("div","",{position:"absolute",inset:"0",background:bg,opacity:isGhost?"0.7":"1",borderRadius:"3px",pointerEvents:"none",zIndex:"0"});
